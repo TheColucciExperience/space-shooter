@@ -1,0 +1,22 @@
+
+/* Space shooter styles */
+
+/* Setting initial width and height to page */
+
+html,
+body {
+	min-width: 100vw;
+	min-height: 100vh;
+}
+
+/* Body default background color */
+
+body { background-color: #111; }
+
+/* Canvas centering for medium and large viewports */
+
+canvas {
+	display: block;
+	margin-left: auto;
+	margin-right: auto;
+}
