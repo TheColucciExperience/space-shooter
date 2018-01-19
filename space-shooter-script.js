@@ -2902,7 +2902,7 @@ window.addEventListener( 'load', function startScript() {
 						img.src = gameObject.media.gameImages[0];
 					}
 					else if ( !gameObject.state.level2.finished ) {
-						img.src = 'https://cdn.tutsplus.com/active/uploads/legacy/tuts/421_stage3dShmup2/stars.gif';
+						img.src = gameObject.media.gameImages[5];
 					}
 					
 					[
