@@ -82,8 +82,8 @@ window.addEventListener( 'load', function startScript() {
 				case gameObject.screen.onLoadingScreen:
 
 					if ( gameObject.loader.loaded ) {
-						gameObject.audio.playSound(  // Default track 3, but is boring
-							gameObject.media.gameTracks[5], true, true
+						gameObject.audio.playSound(
+							gameObject.media.gameTracks[3], true, true
 						);
 						gameObject.screen.changeScreen( 'onIntroScreen' );
 					}
@@ -107,13 +107,13 @@ window.addEventListener( 'load', function startScript() {
 
 					// Drawing intro story
 
-					gameObject.components.intro.move();
-					gameObject.components.intro.update();
+					gameObject.interface.intro.move();
+					gameObject.interface.intro.update();
 					gameObject.graphics.clear();
 					gameObject.graphics.drawBackground();
 					gameObject.graphics.drawIntro();
 
-					if ( gameObject.components.intro.finished ) {
+					if ( gameObject.interface.intro.finished ) {
 						gameObject.screen.changeScreen( 'onTitleScreen' );
 					}
 
@@ -121,7 +121,7 @@ window.addEventListener( 'load', function startScript() {
 
 				case gameObject.screen.onTitleScreen:
 
-					gameObject.components.title.update();
+					gameObject.interface.title.update();
 					gameObject.graphics.clear();
 					gameObject.graphics.drawBackground();
 					gameObject.graphics.drawTitle();
@@ -132,7 +132,7 @@ window.addEventListener( 'load', function startScript() {
 						 gameObject.screen.onHowToScreen ||
 						 gameObject.screen.onOptionScreen:
 
-				  gameObject.components.backBtn.update();
+				  gameObject.interface.backBtn.update();
 					gameObject.graphics.clear();
 					gameObject.graphics.drawBackground();
 
@@ -143,11 +143,222 @@ window.addEventListener( 'load', function startScript() {
 						gameObject.graphics.drawHowTo();
 					}
 					else {
-						gameObject.components.options.update();
+						gameObject.interface.options.update();
 						gameObject.graphics.drawOptions();
 					}
 
 					gameObject.graphics.drawBackBtn();
+
+					break;
+
+				case gameObject.screen.onPlayingScreen:
+
+					/* We won't handle everything about the game here for code
+					 * readability and maintenance purposes. Instead for some tasks 
+					 * we'll call a generator if some condition is met.
+					 */
+
+					if ( !gameObject.state.started &&
+					     !gameObject.state.inTransition ) {
+						gameObject.state.inTransition = true;
+						gameObject.audio.changeTrack(
+							gameObject.media.gameTracks[4],
+							true,	true, false
+						);
+					}
+					else if ( gameObject.state.inTransition ) {
+
+						if ( gameObject.audio.transitionFinished &&
+						     gameObject.screen.transitionReady ) {
+							gameObject.audio.transitionFinished = false;
+							gameObject.state.inTransition = false;
+							gameObject.state.started = true;
+						}
+
+						gameObject.screen.transitionScreen();
+
+					}
+
+					// Game Started
+
+					else if ( gameObject.state.started &&
+										!gameObject.state.gameOver.started ) {
+
+						// Changing states based on game progression
+
+						if ( !gameObject.state.level1.started ) {
+							gameObject.state.level1.started = true;
+						}
+						else if ( gameObject.state.level1.bossFinished &&
+											!gameObject.state.level1.inVictory &&
+											gameObject.audio.transitionFinished )
+						{
+							gameObject.state.level1.inVictory = true;
+							gameObject.state.victory.intervalReferenceTime =
+							gameObject.time.currentTime;
+						}
+
+						// Performing actions
+
+						gameObject.components.update();
+						gameObject.components.moveAll();
+						gameObject.components.checkAll();
+
+						// Drawing
+
+						gameObject.graphics.clear();
+						gameObject.graphics.drawBackground();
+						gameObject.graphics.drawPowerUps();
+						gameObject.graphics.drawShots();
+						gameObject.graphics.drawPlayer();
+						gameObject.graphics.drawEnemies();
+						gameObject.graphics.drawInfo();
+
+						/* These will be level transitions that will mainly provide
+						 * a room for the background to change
+						 */
+
+						// Level 1 transition
+
+						if (	gameObject.state.level1.inVictory &&
+									!gameObject.state.level2.started &&
+									gameObject.time.currentTime -
+									gameObject.state.victory.intervalReferenceTime >
+									gameObject.state.victory.intervalTime )
+						{
+
+							gameObject.screen.transitionScreen();
+
+							if ( gameObject.screen.transitionReady &&
+									 !gameObject.state.level1.finished ) {
+
+								gameObject.state.level1.finished = true;
+								gameObject.audio.changeTrack(
+									gameObject.media.gameTracks[5],
+									true, true, false
+								);
+
+							}
+							else if ( gameObject.screen.transitionFinished ) {
+
+								gameObject.state.level2.started = true;
+
+								// Reseting transition properties
+
+								gameObject.screen.transitionScreen();
+
+							}
+
+						}
+
+						// Handling end of start and eventual game over transitions
+
+						// This will be at last as it needs to be drawn over everything
+
+						if ( gameObject.screen.transitionStarted &&
+						     !gameObject.screen.transitionFinished &&
+						     !gameObject.state.gameOver.inTransition &&
+						     !gameObject.state.gameOver.started ) {
+
+							gameObject.screen.transitionScreen();
+
+							// To restart properties, in case we need more transitions
+
+							if ( gameObject.screen.transitionFinished ) {
+								gameObject.screen.transitionScreen();
+							}
+
+						}
+						else if ( gameObject.state.gameOver.inTransition &&
+											!gameObject.screen.transitionReady ) {
+
+							gameObject.screen.transitionScreen();
+
+							if ( gameObject.screen.transitionReady ) {
+								gameObject.audio.changeTrack(
+									gameObject.media.gameTracks[0],
+									false,
+									true,
+									false
+								);
+								gameObject.state.gameOver.inTransition = false;
+								gameObject.state.gameOver.started = true;
+								gameObject.state.resetGame();
+								gameObject.screen.changeScreen( 'onGameOverScreen' );
+							}
+
+						}
+
+					}
+
+
+					break;
+
+				case gameObject.screen.onGameOverScreen:
+
+					/* Audio will be loaded from the last conditional of playing
+					 * screen, so we can use it to activate the timer for game over
+					 * animation
+					 */
+
+					if ( gameObject.audio.transitionFinished &&
+					     !gameObject.state.gameOver.audioLoaded ) {
+						gameObject.audio.transitionFinished = false;
+						gameObject.state.gameOver.audioLoaded = true;
+						gameObject.state.gameOver.intervalReferenceTime =
+						gameObject.time.currentTime;
+						gameObject.graphics.clear();
+						gameObject.graphics.drawGameOver(); // Else we get a flicker
+					}
+					else if ( gameObject.state.gameOver.audioLoaded &&
+										gameObject.time.currentTime -
+										gameObject.state.gameOver.intervalReferenceTime >=
+										gameObject.state.gameOver.intervalTime) {
+
+						// Changing to initial track
+
+						if ( !gameObject.state.gameOver.finished ) {
+							gameObject.state.gameOver.finished = true;
+							gameObject.audio.changeTrack(
+								gameObject.media.gameTracks[3],
+								true, true, false
+							);
+						}
+						else if ( gameObject.audio.transitionFinished ) {
+							// Reseting audio state for future transitions
+							gameObject.audio.transitionFinished = false;
+						}
+
+						// Title background, not actually there yet
+
+						gameObject.graphics.clear();
+						gameObject.graphics.drawTitle();
+						gameObject.screen.transitionScreen();
+
+						/* If transitionScreen method has already reseted properties,
+						 * it's over
+						 */
+
+						if ( !gameObject.screen.transitionStarted ) {
+
+							// Reseting game over properties
+
+							gameObject.state.gameOver.inTransition = false;
+							gameObject.state.gameOver.started = false;
+							gameObject.state.gameOver.finished = false;
+							gameObject.state.gameOver.audioLoaded = false;
+
+							// Back to title
+
+							gameObject.screen.changeScreen( 'onTitleScreen' );
+
+						}
+
+					}
+					else {
+						gameObject.graphics.clear();
+						gameObject.graphics.drawGameOver();	
+					}
 
 					break;
 
@@ -159,6 +370,8 @@ window.addEventListener( 'load', function startScript() {
 			gameObject.id = requestAnimationFrame( updater );
 
 		},
+
+		// Just in case we want to add a play/pause game command later
 
 		stopGame() {
 			cancelAnimationFrame( gameObject.id );
@@ -188,6 +401,1605 @@ window.addEventListener( 'load', function startScript() {
 			deltaRate: 0
 		},
 
+		// Media resources
+
+		media: {
+			gameTracks: [], // game-over | victory | boss | title | level-1 | level-2
+
+			gameSE: [],     // power-up | p-shot-2 | enemy-shot | p-shot-3 -->
+											// p-shot-1
+
+			gameImages: [], // bg-1 | boss-1 | enemy-1 | enemy-2 | player | bg-2 -->
+										  // boss-2 | enemy-3 | enemy-4
+		},
+
+		// State object to keep track of game steps
+
+		state: {
+
+			// These will be used to control game states in game over, levels, etc.
+
+			inTransition: false,
+			started: false,
+			finished: false,
+
+			// Levels states
+
+			level1: {
+				started: false,
+
+				/* Score needed to achieve to fight boss. For test purposes it's
+				 * 1 now, but default === 10000
+				 */
+
+				bossScore: 1,					
+				bossStarted: false,
+				bossFinished: false,
+				inVictory: false,		// For victory track and level transition
+				finished: false
+			},
+
+			level2: {
+				started: false,
+				bossScore: 80000,
+				bossStarted: false,
+				bossFinished: false,
+				inVictory: false,
+				finished: false
+			},
+
+			// This will take care of game over animation when player dies
+
+			gameOver: {
+				inTransition: false,
+				started: false,
+				finished: false,
+				audioLoaded: false,
+				intervalReferenceTime: 0,
+				intervalTime: 12000		// Interval to show gameOver message
+			},
+
+			// This will keep track of victory animation time, and when to move on
+
+			victory: {
+				intervalTime: 15000,
+				intervalReferenceTime: 0,
+			},
+
+			// Method to reset game properties
+
+			resetGame() {
+
+				// Background
+
+				gameObject.components.background.x = 0;
+				gameObject.components.background.y1 = 0;
+				gameObject.components.background.y2 = -canvasHeight;
+
+				// Player
+
+				gameObject.components.player.x = canvasWidth * .5 - 30;
+				gameObject.components.player.y = canvasHeight * 1.1;
+				gameObject.components.player.allowPlayer = false;
+				gameObject.components.player.speed = 1 / 2;
+				gameObject.components.player.lives = 3;
+				gameObject.components.player.invincible = false;
+				gameObject.components.player.hitPoints = 1;
+				gameObject.components.player.score = 0;
+				gameObject.components.player.deathAnimationCanDraw = true;
+				gameObject.components.player.shots = [];
+				gameObject.components.player.shotType = 1;
+				gameObject.components.player.collisionCircle.x = canvasWidth * .5;
+				gameObject.components.player.collisionCircle.y =
+				canvasHeight * 1.1	+ 30;
+
+				// Power ups
+
+				gameObject.components.powerUps.list = [];
+				gameObject.components.powerUps.spawnInterval = 50000;
+
+				// Enemies
+
+				gameObject.components.enemies.list = [];
+				gameObject.components.enemies.bosses = [];
+				gameObject.components.enemies.shots = [];
+				gameObject.components.enemies.spawnInterval = 14000;
+
+				// States
+
+				gameObject.state.inTransition = false;
+				gameObject.state.started = false;
+				gameObject.state.finished = false;
+
+				gameObject.state.level1.started = false;
+				gameObject.state.level1.bossStarted = false;
+				gameObject.state.level1.bossFinished = false;
+				gameObject.state.level1.inVictory = false;
+				gameObject.state.level1.finished = false;
+				
+				gameObject.state.level2.started = false;
+				gameObject.state.level2.bossStarted = false;
+				gameObject.state.level2.bossFinished = false;
+				gameObject.state.level2.inVictory = false;
+				gameObject.state.level2.finished = false;
+
+				gameObject.state.victory.intervalReferenceTime = 0;
+
+			}
+
+		},
+
+		/* New components object (yeah, there was an old one, actually interface)
+		 * to contain player, enemies, etc.
+		 */
+
+		components: {
+
+			// Game components and methods
+
+			background: {
+
+				/* There will be Ys positions as we need two backgrounds
+				 * for scroll effect
+				 */
+
+				x: 0,
+				y1: 0,
+				y2: -canvasHeight,
+				width: canvasWidth,
+				height: canvasHeight,
+
+				move() {
+
+					this.y1 += gameObject.time.deltaRate * ( 1 / 3 );
+					this.y2 += gameObject.time.deltaRate * ( 1 / 3 );
+
+					if ( this.y1 >= canvasHeight ) {
+						this.y1 = -canvasHeight;
+					}
+
+					if ( this.y2 >= canvasHeight ) {
+						this.y2 = -canvasHeight;
+					}
+					
+				}
+
+			},
+
+			// Player object will hold player data, methods, states, etc.
+
+			player: {
+
+				x: canvasWidth * .5 - 30,			// Initial X
+				y: canvasHeight * 1.1,        // Initial Y
+				width: 60,
+				height: 60,
+				speed: 1 / 2,
+				allowPlayer: false,           // Useful for simple animations
+				lives: 3,
+				hitPoints: 1,
+				invincible: false,
+				score: 0,
+
+				// Properties for player death animation
+
+				deathAnimationStep: 0,
+				deathAnimationMaxStep: 10,
+				deathAnimationInterval: 200,
+				deathAnimationReferenceTime: 0,
+				// If gameObject.graphics can draw player
+				deathAnimationCanDraw: true,				
+
+				// Control properties
+
+				movingRight: false,
+				movingLeft: false,
+				movingUp: false,
+				movingDown: false,
+				shooting: false,
+
+				// Player shot data
+
+				shotInterval: 700,
+				shotReferenceTime: 0,
+				shots: [],			// Array with player shots
+				shotType: 1,		// 1 || 2 || 3 depending on power ups
+
+				// Collision circle
+
+				collisionCircle: {
+					x: canvasWidth * .5,
+					y: canvasHeight * 1.1	+ 30,
+					radius: 24
+				},
+
+				// Move method
+
+				move() {
+
+					// Intro animation
+
+					if ( !this.allowPlayer ) {
+
+						this.y -= gameObject.time.deltaRate * this.speed;
+						this.x = canvasWidth * .5 - this.width / 2;  // If resize
+
+						if ( this.y + this.height / 2 <= canvasHeight * .7 ) { 
+							this.allowPlayer = true;  // Animation finished
+						}
+
+					} else {
+						
+						if ( this.movingUp ) {
+							this.y -= gameObject.time.deltaRate * this.speed;
+						}
+
+						if ( this.movingDown ) {
+							this.y += gameObject.time.deltaRate * this.speed;
+						}
+
+						if ( this.movingLeft ) {
+							this.x -= gameObject.time.deltaRate * this.speed;
+						}
+
+						if ( this.movingRight ) {
+							this.x += gameObject.time.deltaRate * this.speed;
+						}
+
+					}
+
+					// Updating collision circle
+
+					this.collisionCircle.x = this.x + this.width / 2;
+					this.collisionCircle.y = this.y + this.height / 2;
+
+				},
+
+				// Shoot method to push shots in array
+
+				shoot() {
+
+					// Angles, radius and endurance
+
+					let angles = [],
+						radius,
+						endurance,
+						speed;
+
+					
+					if ( this.shotType === 1 || this.shotType === 2 ) {
+
+						radius = 10;
+						endurance = 1;
+						speed = 2;
+
+						if ( this.shotType === 1 ) {
+							angles.push( -Math.PI / 2 );
+						}
+						else {
+							angles.push( -3 * Math.PI / 4 );
+							angles.push( -Math.PI / 2 );
+							angles.push( -Math.PI / 4 );	
+						}
+
+					}
+					else {
+						radius = 20;
+						endurance = 4;
+						speed = 1;
+						angles.push( -Math.PI / 2 );
+					}
+
+						
+					angles.forEach( function pushShot(angle) {
+
+						gameObject.components.player.shots.push( {
+
+							// Player's center
+
+							x: gameObject.components.player.x +
+								 gameObject.components.player.width / 2,
+							y: gameObject.components.player.y +
+							   gameObject.components.player.height / 2,
+							radius: radius,
+							speed: speed,
+							angle: angle,
+							endurance: endurance,
+							type: gameObject.components.player.shotType,
+							move() {
+								this.y += gameObject.time.deltaRate *
+													this.speed * Math.sin( this.angle );
+							  this.x += gameObject.time.deltaRate *
+							  					this.speed * Math.cos( this.angle );
+
+							}
+
+						} );
+
+
+					} );
+
+					// Shoot effect is different for each type
+
+					let shotAudio;
+
+					if ( this.shotType === 1 ) {
+						shotAudio = gameObject.media.gameSE[4];
+					}
+					else if ( this.shotType === 2 ) {
+						shotAudio = gameObject.media.gameSE[1];
+					}
+					else {
+						shotAudio = gameObject.media.gameSE[3];	
+					}
+
+					gameObject.audio.playSound( shotAudio, false, false, true );
+
+				},
+
+				// Animation for when player dies
+
+				deathAnimate() {
+
+					let result = true;  // To determine if we make a recursion call
+					const player = gameObject.components.player;
+
+					if ( gameObject.time.currentTime -
+							 player.deathAnimationReferenceTime >
+							 player.deathAnimationInterval ) {
+
+						player.deathAnimationReferenceTime = gameObject.time.currentTime;
+						player.deathAnimationCanDraw = !player.deathAnimationCanDraw;
+						player.deathAnimationStep++;
+
+						if ( player.deathAnimationStep === player.deathAnimationMaxStep ) {
+
+							player.deathAnimationStep = 0;
+							player.deathAnimationReferenceTime = 0;
+							player.invincible = false;
+							player.hitPoints = 1;
+							result = false;
+
+							if ( player.lives > 0 ) {
+								player.deathAnimationCanDraw = true;
+							}
+							else {
+
+								player.deathAnimationCanDraw = false;
+
+								/* This is necessary in case the player dies in a level 
+								 * transition, or else it may get broken, as it uses
+								 * the same properties as keys to change screen, music, etc.
+								 */
+
+								gameObject.screen.transitionStarted = false;
+								gameObject.screen.transitionReady = false;
+								gameObject.screen.transitionFinished = false;
+								gameObject.screen.transitionAlphaColor = 0;
+
+								// Calling game over transitions adn resseting audio
+
+								gameObject.audio.transitionFinished = false;
+								gameObject.state.gameOver.inTransition = true;
+
+							}
+
+						}
+
+					}
+
+					if ( result ) {
+						window.requestAnimationFrame(
+								gameObject.components.player.deathAnimate
+							);
+					}
+
+				}
+
+			},
+
+			// Enemies object with enemy arrays, properties, etc.
+
+			enemies: {
+				
+				list: [],      //  List with enemies to perform actions and checks
+				bosses: [],    // Level bosses
+				shots: [],
+				spawnInterval: 14000,  		// This will vary slightly
+				spawnReferenceTime: 0,		// Reference to check if we can spawn
+
+				spawnEnemy() {
+
+					/* Enemies will have different types and spawn interval will
+					 * change slighty
+					 */
+
+					let type;
+
+					if ( !gameObject.state.level1.finished ) {
+						type = Math.round( Math.random() + 1 ); // 1 - 2
+					}
+					else if ( gameObject.state.level2.started ) {
+						//type = Math.round( Math.random() + 3 ); // 3 - 4
+					}
+
+					// Enemy data (vary with type)
+
+					let hitPoints,
+						scorePoints,
+						deathAnimationInterval,
+						deathAnimationMaxStep,
+						width,
+						height,
+						shotOffsetX,
+						shotOffsetY,
+						shotWidth,
+						shotHeight,
+						shotRadius,
+						shotEndurance,
+						shotSpeed;
+
+					if ( type === 1 ) {
+
+						width = 70;
+						height = 70;
+						hitPoints = 1;
+						scorePoints = 300;
+						shotWidth = null;    	 // Not a rectangular shot
+						shotHeight = null;
+						shotOffsetX = width / 2;
+						shotOffsetY = height / 2;
+						shotRadius = 10;
+						shotEndurance = 1;
+						shotSpeed = 2;
+						deathAnimationInterval = 100;
+						deathAnimationMaxStep = 12;
+
+					}
+					else if ( type === 2 ) {
+
+						width = 80;
+						height = 80;
+						hitPoints = 2;
+						scorePoints = 400;
+						shotWidth = 4;    	 
+						shotHeight = 10;
+						shotOffsetX = ( width - shotWidth ) / 2;
+						shotOffsetY = height / 2;
+						shotRadius = null;		// Not a circular shot
+						shotEndurance = 2;
+						shotSpeed = 2;
+						deathAnimationInterval = 150;
+						deathAnimationMaxStep = 10;
+
+					}
+
+					this.spawnInterval -= Math.floor( Math.random() * 300 + 300 );
+
+					if ( this.spawnInterval < 10000 ) {
+						this.spawnInterval = 10000;
+					}
+
+					/* We'll put random x and y's in variables because we need to
+					 * reference them in the collision circle
+					 */
+
+					const x = Math.random() * canvasWidth * .9 + 50,
+						y = -30 - Math.random() * 30;
+
+					// Hit points will vary depending on enemy type
+
+					// Pushing enemy to enemies list
+
+					this.list.push( {
+
+						x: x,
+						y: y,
+						width: width,
+						height: height,
+						hitPoints: hitPoints,
+						scorePoints: scorePoints,
+						angle: Math.PI / 2,
+						speedX: .6 + ( ( Math.random() * 2 ) / 2 ),
+						speedY: ( .5 + Math.random() ) / 3,
+						angleSpeed: Math.PI / 90,
+
+						// Shot interval between  2000 - 3500
+
+						shotInterval: Math.round( Math.random() * 1500 + 2000 ),
+						shotReferenceTime: 0,
+
+						// Death animation properties
+
+						deathAnimationStep: 0,
+						deathAnimationMaxStep: deathAnimationMaxStep,
+						deathAnimationInterval: deathAnimationInterval,
+						deathAnimationReferenceTime: 0,
+						deathAnimationCanDraw: true,
+
+						// If dead enemy will stop shooting and moving in the X axis
+
+						dead: false, 
+						type: type,
+
+						/* Mainly for deathAnimate() to differentiate between bosses
+						 * and common enemies
+						 */
+
+						isBoss: false,		
+
+						// Collision circle for... well... collisions..
+
+						collisionCircle: {
+							x: x + width / 2,
+							y: y + height / 2,
+							radius: width * ( 2 / 5 )
+						},
+
+						// Move and shoot methods
+
+						move() {
+
+							/* For the first behavior, if the enemy is within a range,
+							 * it will move around a certain area near the player, else
+							 * it will move towards the player. The second will rotate
+							 * in the player direction but will not move
+							 */
+
+							// Alias
+
+							const player = gameObject.components.player;
+
+							if ( this.type === 1 ) {
+
+
+								if ( this.x <
+										 player.x + ( player.width / 2 ) - canvasWidth * .3 )
+								{
+									this.speedX = Math.abs( this.speedX );
+								}
+								else if ( this.x + this.width > 
+									player.x + ( player.width / 2 ) + canvasWidth * .3 )
+								{
+									this.speedX = -Math.abs( this.speedX );
+								}
+
+								// Position and collision circle updates
+								
+								if ( !this.dead ) {
+									this.x +=	gameObject.time.deltaRate * this.speedX;	
+									this.collisionCircle.x = this.x + this.width / 2;
+								}
+								
+								this.y +=	gameObject.time.deltaRate * this.speedY;
+								this.collisionCircle.y = this.y + this.height / 2;
+
+							}
+							else if ( this.type === 2 ) {
+
+								/* We'll use some trigonometry here. We'll increase or
+								 * decrease the angle based on the player's position.
+								 * We'll get the actual angle and compare with the current
+								 * one
+								 */
+
+								const	currentAngle =
+								Math.atan2(
+									player.y + player.height / 2 - this.y,
+									player.x + player.width / 2  - this.x
+								);
+
+
+								/* If difference between angles is greater than
+								 * angle speed to prevent bugs
+								 */
+
+								if ( Math.abs( this.angle - currentAngle ) >=
+										 this.angleSpeed && !this.dead )
+								{
+
+									// Turn left or right
+
+									if ( this.angle < currentAngle ) {
+										this.angle += this.angleSpeed;
+									}
+									else if ( this.angle > currentAngle ) {										
+										this.angle -= this.angleSpeed;
+									}
+
+								}
+
+							  this.y += this.speedY;
+							  this.collisionCircle.y = this.y + this.height / 2;
+
+							}
+
+						},
+
+						shoot() {
+
+							if ( !this.dead ) {
+
+								gameObject.components.enemies.shots.push( {
+
+									x: this.x + shotOffsetX,
+									y: this.y + shotOffsetY,
+									width: shotWidth,
+									height: shotHeight,
+									radius: shotRadius,
+									endurance: shotEndurance,
+									angle: this.angle,
+									speed: shotSpeed,
+									type: this.type,
+
+									move() {
+										this.y += gameObject.time.deltaRate *
+												this.speed * Math.sin( this.angle );
+						  			this.x += gameObject.time.deltaRate *
+						  					this.speed * Math.cos( this.angle );
+									}
+
+								} );
+
+								// Playing shot sound
+
+								gameObject.audio.playSound(
+									gameObject.media.gameSE[2], false, false, true
+								);
+							}
+
+						}
+
+					} );
+
+				},
+
+				deathAnimate(enemy, index) {
+
+					let result = true;  // To determine if we make a recursion call
+
+					if ( gameObject.time.currentTime -
+							 enemy.deathAnimationReferenceTime >
+							 enemy.deathAnimationInterval ) {
+
+						enemy.deathAnimationReferenceTime = gameObject.time.currentTime;
+						enemy.deathAnimationCanDraw = !enemy.deathAnimationCanDraw;
+						enemy.deathAnimationStep++;
+
+						// For boss to slowly fade away
+
+						if ( enemy.isBoss ) {
+
+							enemy.deathAnimationInterval -= 50;
+
+							if ( enemy.deathAnimationInterval <= 50 ) {
+								enemy.deathAnimationInterval = 50;
+							}
+
+						}
+
+						if ( enemy.deathAnimationStep === enemy.deathAnimationMaxStep ) {
+
+							if ( enemy.isBoss ) {
+
+								gameObject.components.enemies.bosses.splice( index, 1 );
+
+								if ( gameObject.state.level1.started &&
+										 !gameObject.state.level1.finished )
+								{
+									gameObject.state.level1.bossFinished = true;
+								}
+								else if ( gameObject.state.level2.started &&
+										 			!gameObject.state.level1.finished )
+								{
+									gameObject.state.level2.bossFinished = true;
+								}
+
+								// This reset is needed to keep track of music transitions
+
+								gameObject.audio.transitionFinished = false;
+
+								// Changing track
+
+								gameObject.audio.changeTrack(
+									gameObject.media.gameTracks[1],
+									false, true, false
+								);
+
+							}
+							else {
+								gameObject.components.enemies.list.splice( index, 1 );	
+							}
+
+							gameObject.components.player.score += enemy.scorePoints;
+							enemy.deathCanDraw = false;
+							result = false;
+
+							if ( gameObject.components.player.score >=
+									 gameObject.state.level1.bossScore &&
+									 !gameObject.state.level1.bossStarted )
+							{
+								gameObject.components.callBoss( 1 );
+							}
+							else if ( gameObject.components.player.score >
+									 			gameObject.state.level2.bossScore &&
+									 			!gameObject.state.level2.bossStarted &&
+									 			gameObject.state.level2.started )
+							{
+								gameObject.components.callBoss( 2 );
+							}
+
+						}
+
+					}
+
+					if ( result ) {
+						window.requestAnimationFrame( function callDeathAnim() {
+							gameObject.components.enemies.deathAnimate( enemy, index );
+						}	);
+					}
+
+				}
+
+			},
+
+			powerUps: {
+
+				list: [],
+				spawnInterval: 50000,
+				spawnReferenceTime: 0,
+
+				spawnPowerUp() {
+
+					this.spawnInterval -= Math.random() * 600;
+
+					if ( this.spawnInterval < 20000 ) {
+						this.spawnInterval = 20000;
+					}
+
+					this.list.push( {
+
+						x: Math.random() * canvasWidth * .9 + 50,
+						y: -30 - Math.random() * 30,
+						width: 30,
+						height: 30,
+						speedY: ( .5 + Math.random() ) / 3,
+						active: false,
+
+						/* Generating random types. They will be, in order:
+						 * shot 1 | shot 2 | shot 3 | lives +1 | speed +.25
+						 */
+
+						type: Math.round( Math.random() * 5 ),
+
+						move() {
+							this.y += gameObject.time.deltaRate * this.speedY;
+						}
+
+					} );
+
+				}
+
+			},
+
+			// Method to call bosses into game
+
+			callBoss(level) {
+
+				// Variables to create boss
+
+				let bossType,
+					width,
+					height,
+					hitPoints,
+					scorePoints,
+					speedX,
+					speedY,
+					angle,
+					angleSpeed,
+					shotOffsetX,
+					shotOffsetY,
+					shotWidth,
+					shotHeight,
+					shotRadius,
+					shotEndurance,
+					shotSpeed,
+					shotInterval,
+					shotIntervalReferenceTime,
+					shotSequenceInterval,
+					shotSequenceReferenceTime,
+					shotSequenceStep,
+					shotSequenceMaxStep;
+
+				if ( level === 1 ) {
+
+					gameObject.state.level1.bossStarted = true;
+
+					/* First boss, but enemy type 5. If we wanted to restart from 1
+					 * we would have to write a method to draw bosses that is exactly
+					 * the same as the one that draw enemies. So it's better to just
+					 * consider any boss as a enemy
+					 */
+
+					bossType = 5;		
+					width = 100;
+					height = 100;	
+					hitPoints = 1;				// For tests, default === 100
+					scorePoints = 10000;
+					speedX = 4;
+					speedY = 0;
+					angle = 0;
+					angleSpeed = 0;
+
+					// Shot related data
+
+					shotOffsetX = width / 2;
+					shotOffsetY = height / 2;
+
+					// Making shot width adequate for viewport
+
+					if ( window.innerWidth >= 576 ) {
+						shotRadius = 30;
+					}
+					else {
+						shotRadius = 20;
+					}
+					
+					shotWidth = null;
+					shotHeight = null;
+					shotEndurance = 10;
+					shotSpeed = 3;
+					shotInterval = 2000;
+					shotIntervalReferenceTime = 0;
+					shotSequenceInterval = 300;
+					shotSequenceReferenceTime = 0;
+					shotSequenceStep = 0;
+					shotSequenceMaxStep = 4;
+
+				}
+
+				// Creating first boss
+
+				gameObject.components.enemies.bosses.push( {
+
+					x: canvasWidth * .5 - 50,
+					y: -200,
+					width: width,
+					height: height,
+					isAnimating: true,
+
+					hitPoints: hitPoints,
+					scorePoints: scorePoints,
+					angle: angle,
+					angleSpeed: angleSpeed,
+					speedX: speedX,
+					speedY: speedY,
+
+					// Shot properties, such as interval, sequenceInterval, times, etc.
+
+					shotInterval: shotInterval,
+					shotIntervalReferenceTime: shotIntervalReferenceTime,
+					shotSequenceInterval: shotSequenceInterval,
+					shotSequenceReferenceTime: shotSequenceReferenceTime,
+
+					/* Number of shots to shoot in sequence, the step in
+					 * shooting them and if next shot is a sequence
+					 */
+
+					shotSequenceStep: shotSequenceStep,
+					shotSequenceMaxStep: shotSequenceMaxStep,
+
+					// Death animation properties
+
+					deathAnimationStep: 0,
+					deathAnimationMaxStep: 50,
+					deathAnimationInterval: 600,
+					deathAnimationReferenceTime: 0,
+					deathAnimationCanDraw: true,
+
+					dead: false, 
+					type: bossType,
+					isBoss: true,
+
+					collisionCircle: {
+						x: canvasWidth * .5,
+						y: -200,
+						radius: width / 2
+					},
+
+					move() {
+
+						if ( this.isAnimating ) {
+
+							this.x = canvasWidth * .5 - 50;  		// For resize
+							this.y += gameObject.time.deltaRate * ( 3 / 4 );
+							
+							this.collisionCircle.x = this.x + this.width / 2;
+							this.collisionCircle.y = this.y + this.height / 2;
+							
+							if ( this.y >= canvasHeight * .1 ) {
+								this.isAnimating = false;
+							}
+
+						}
+						else if ( !this.dead ) {
+
+							if ( this.type === 5 ) {
+
+								if ( this.x <= 0 ) {
+
+									this.x = 0;
+									this.speedX = Math.abs( this.speedX );
+
+								}
+								else if ( this.x + this.width >= canvasWidth ) {
+
+									this.x = canvasWidth - this.width;
+									this.speedX = -Math.abs( this.speedX );
+
+								}
+
+								this.x += gameObject.time.deltaRate * this.speedX;
+								this.collisionCircle.x = this.x + this.width / 2;
+
+							}
+
+						}
+
+					},
+
+					shoot() {
+
+						if ( !this.dead ) {
+
+							/* There will be two intervals checked by checkAll. One will
+							 * be the interval between shot actions and another 
+							 * between shots sequences (shotInterval and
+							 * shotSequenceInterval, respectively). This method will only
+							 * handle steps and the shotInSequence boolean
+							 */
+
+							this.shotSequenceStep++;
+
+							if ( this.shotSequenceStep >= this.shotSequenceMaxStep ) {
+
+								// Sequence ended
+
+								this.shotSequenceStep = 0;
+								this.shotInSequence = false;
+
+								// Updating interval reference
+
+								this.shotIntervalReferenceTime = gameObject.time.currentTime;
+
+							}
+
+							// The shot itself
+
+							if ( this.type === 5 ) {
+
+								gameObject.components.enemies.shots.push( {
+
+									x: this.x + shotOffsetX,
+									y: this.y + shotOffsetY,
+									width: shotWidth,
+									height: shotHeight,
+									radius: shotRadius,
+									endurance: shotEndurance,
+
+									/* Angle is relative to canvas. As the boss angle is 0,
+									 * because the image is already adjusted by default, we
+									 * need to add Math.PI / 2 to make the shot go down
+									 */
+
+									angle: this.angle + Math.PI / 2,
+									speed: shotSpeed,
+									type: this.type,
+
+									move() {
+										this.y += gameObject.time.deltaRate *
+												this.speed * Math.sin( this.angle );
+						  			this.x += gameObject.time.deltaRate *
+						  					this.speed * Math.cos( this.angle );
+									}
+
+								} );
+
+							}
+
+							// Playing shot sound
+
+							gameObject.audio.playSound(
+								gameObject.media.gameSE[2], false, false, true
+							);
+
+						}
+
+					}
+
+				} );
+
+				// Changing to boss track
+
+				gameObject.audio.changeTrack(
+					gameObject.media.gameTracks[2],
+					true, true, false
+				);
+
+			},
+
+			/* This method will be responsible to move all components
+			 * by calling their 'move' method
+			 */
+
+			moveAll() {
+
+				/* We'll use a forEach in a array of lists, and them move the
+				 * objects inside them
+				 */
+
+				[
+					[ this.background, this.player ],
+					this.enemies.list,
+					this.enemies.bosses,
+					this.powerUps.list,
+					this.player.shots,
+					this.enemies.shots
+				].forEach( function moveList(list) {
+
+					list.forEach( function moveComponent(component) {
+						component.move();
+					} );
+
+				} );
+
+			},
+
+			/* This method will do or call all necessary checks 
+			 * (collisions, key updates) to maintain game flow and react to changes
+			 */
+
+			checkAll() {
+
+				// Maintain player on screen
+
+				if ( this.player.x <= 0 ) {
+					this.player.x = 0;
+				} else if ( this.player.x + this.player.width >= canvasWidth ) {
+					this.player.x = canvasWidth - this.player.width;
+				}
+
+				if ( this.player.y <= 0 ) {
+					this.player.y = 0;
+				} else if ( this.player.y + this.player.height >= canvasHeight ) {
+					this.player.y = canvasHeight - this.player.height;
+				}
+
+				if ( this.player.shooting && 
+				     gameObject.time.currentTime - this.player.shotReferenceTime >
+				     this.player.shotInterval )
+				{
+
+					this.player.shotReferenceTime = gameObject.time.currentTime;
+					this.player.shoot();
+
+				}
+
+				if ( this.player.hitPoints <= 0 && !this.player.invincible ) {
+					this.player.lives--;
+					this.player.invincible = true;
+					window.requestAnimationFrame( this.player.deathAnimate );
+				}
+
+				// Checking power up spawn
+
+				if ( gameObject.time.currentTime - this.powerUps.spawnReferenceTime > 
+					   this.powerUps.spawnInterval &&
+					   gameObject.components.player.allowPlayer )
+				{
+					this.powerUps.spawnReferenceTime =	gameObject.time.currentTime;
+					this.powerUps.spawnPowerUp();
+				}
+
+				// Checking for active power ups
+
+				this.powerUps.list.forEach( function checkActivity(powerUp, index) {
+
+					if ( powerUp.active ) {
+
+						switch ( powerUp.type ) {
+
+							case 1:
+								gameObject.components.player.shotType = 1;
+								break;
+							case 2:
+								gameObject.components.player.shotType = 2;
+								break;
+							case 3:
+								gameObject.components.player.shotType = 3;
+								break;
+							case 4:
+								gameObject.components.player.lives += 1;
+								break;
+							case 5:
+								gameObject.components.player.speed += .25;
+								break;
+							default:
+								console.log( 'Unknown power up!' );
+
+						}
+
+						gameObject.components.powerUps.list.splice( index, 1 );
+						gameObject.audio.playSound(
+							gameObject.media.gameSE[0], false, false, false
+						);
+
+					}
+
+				} );
+
+				// Checking for enemy spawn ( not when fighting bosses )
+
+				if ( gameObject.time.currentTime - this.enemies.spawnReferenceTime > 
+					   this.enemies.spawnInterval &&
+					   gameObject.components.player.allowPlayer &&
+					   !( gameObject.state.level1.bossStarted &&
+					   		!gameObject.state.level1.finished ) &&
+					   !( gameObject.state.level2.bossStarted &&
+					   		!gameObject.state.level2.finished ) )
+				{
+					this.enemies.spawnReferenceTime =	gameObject.time.currentTime;
+					this.enemies.spawnEnemy();
+				}
+
+				// Checking enemy and enemy shoot action
+
+				this.enemies.list.forEach(
+
+					function checkEnemy(enemy, index) {
+
+						// If enemy is offscreen (Y axis) or dead, get him out
+
+						if ( enemy.y > canvasHeight + 30 ) {
+							gameObject.components.enemies.list.splice( index, 1 );
+						}
+
+						if ( enemy.hitPoints <= 0 && !enemy.dead ) {
+							enemy.dead = true;
+							gameObject.components.enemies.deathAnimate( enemy, index );
+						}
+
+						if (
+								gameObject.time.currentTime - enemy.shotReferenceTime >
+						  	enemy.shotInterval
+						  )
+						{
+							enemy.shotReferenceTime = gameObject.time.currentTime;
+							enemy.shoot();
+						}
+
+					}
+
+				);
+
+				// Checking for bosses death and shoot action
+
+				this.enemies.bosses.forEach( function checkBossShot(boss, index) {
+
+					if ( !boss.dead ) {
+
+						if ( !boss.isAnimating ) {
+
+							if ( gameObject.time.currentTime -
+										 boss.shotIntervalReferenceTime >=
+										 boss.shotInterval )
+							{
+								
+								if ( gameObject.time.currentTime -
+										 boss.shotSequenceReferenceTime >=
+									 	 boss.shotSequenceInterval )
+								{
+									boss.shotSequenceReferenceTime =
+									gameObject.time.currentTime;
+									boss.shoot();
+								}
+
+							}
+
+						}
+
+						if ( boss.hitPoints <= 0 ) {
+							boss.dead = true;
+							gameObject.components.enemies.deathAnimate( boss, index );
+						}
+
+					}
+
+				} );
+
+				// Removing useless shots out of screen and dead shots
+
+				[
+					this.player.shots,
+					this.enemies.shots
+				].forEach( function accessShotList(list) {
+
+					list.forEach( function removeShots(shot, index) {
+
+						if ( shot.x > canvasWidth + 50 ||
+				     shot.x < -50 ||
+				     shot.y > canvasHeight + 50 ||
+				     shot.y < -50 ||
+				     shot.endurance <= 0 )
+						{
+							// Removing shot from list (array if you wish)
+							list.splice( index, 1 );
+						}	
+
+					} );
+
+				} );
+
+				// Checking collisions
+
+				this.checkAllCollisions();
+
+			},
+
+			/* Checking all game collisions. We do it here instead of checkAll
+			 * to keep things organized (well, a little), but this will only be
+			 * called inside checkAll
+			 */
+
+			checkAllCollisions() {
+
+				/* We will check collisions on enemy shots and enemies instead of
+				 * the player or player shots. This is because enemies vary in
+				 * different levels, and their properties might affect how we
+				 * evaluate these collisions.
+				 */
+
+				[
+					this.enemies.list,
+					this.enemies.bosses
+				].forEach( function accessEnemyList(list) {
+
+					list.forEach(	function checkEnemyCollisions(enemy) {
+
+						// Checking enemy/player
+
+						if ( gameObject.components.checkCollisionTwoCircles(
+								   enemy.collisionCircle,
+								   gameObject.components.player.collisionCircle
+					    	 ) &&
+					    	 !gameObject.components.player.invincible &&
+					    	 !enemy.dead )
+						{
+							gameObject.components.player.hitPoints--;
+							enemy.hitPoints--;
+						}
+
+						// Checking enemy/player-shots
+
+						gameObject.components.player.shots.forEach(
+
+							function checkPlayerShotCollision(playerShot) {
+
+								if ( gameObject.components.checkCollisionTwoCircles(
+										   enemy.collisionCircle,
+										   playerShot
+										 ) &&
+									   !enemy.dead )
+								{
+									playerShot.endurance--;
+									enemy.hitPoints--;
+								}
+
+							}
+
+						);
+
+					});
+
+				} );
+
+				// Checking enemy-shots/player and enemy-shots/player-shots
+
+				this.enemies.shots.forEach(
+
+					function checkEnemyShotCollision(enemyShot) {
+
+						// Circular shot
+
+						if ( ( enemyShot.type === 1 || enemyShot.type === 5 ) &&
+							   gameObject.components.checkCollisionTwoCircles(
+							     gameObject.components.player.collisionCircle,
+							     enemyShot
+							   )
+							   && !gameObject.components.player.invincible )
+						{
+							gameObject.components.player.hitPoints--;
+							enemyShot.endurance--;
+						}
+						else if (
+								enemyShot.type === 2 &&
+								gameObject.components.checkCollisionCircleRect(
+									gameObject.components.player.collisionCircle,
+									enemyShot
+								) &&
+								!gameObject.components.player.invincible )
+						{
+							gameObject.components.player.hitPoints--;
+							enemyShot.endurance--;
+						}
+
+						gameObject.components.player.shots.forEach(
+
+							function checkShotsCollision(playerShot) {
+
+								if ( ( enemyShot.type === 1 || enemyShot.type === 5 ) &&
+							   		 gameObject.components.checkCollisionTwoCircles(
+							     	   playerShot, enemyShot
+							   		 )
+								)
+								{
+									playerShot.endurance--;
+									enemyShot.endurance--;
+								}
+								else if ( enemyShot.type === 2 &&
+							   		 gameObject.components.checkCollisionCircleRect(
+							     	   playerShot, enemyShot
+							   		 )
+								)
+								{
+									playerShot.endurance--;
+									enemyShot.endurance--;
+								}
+
+							}
+
+						);
+
+					}
+
+				);
+
+				// Checking power-ups/player
+
+				this.powerUps.list.forEach(
+
+					function checkPowerUpCollision(powerUp) {
+
+						if ( gameObject.components.checkCollisionCircleRect(
+								   gameObject.components.player.collisionCircle,
+								   powerUp
+								 ) )
+						{
+							powerUp.active = true;
+						}
+
+					}
+
+				);
+
+			},
+
+			// These methods will check if there is a collision between objects
+
+			checkCollisionTwoCircles(circle1, circle2) {
+
+				// Simple geometry here
+
+				const distance = Math.sqrt(
+						Math.pow( circle1.x - circle2.x, 2 ) +
+						Math.pow( circle1.y - circle2.y, 2 )
+				);
+
+				return distance <= circle1.radius + circle2.radius ;
+
+			},
+
+			checkCollisionCircleRect(circle, rect) {
+
+				/* We'll place a point on an edge of the rectangle, and check
+				 * if it's distance is less than the circle radius. Note we're
+				 * not checking if the circle is inside the rect or vice-versa,
+				 * because it may be unnecessary
+				 */
+				 
+
+				let testPointX = circle.x,
+					testPointY = circle.y;
+
+				if ( testPointX < rect.x ) {
+					testPointX = rect.x;
+				}
+				else if ( testPointX > rect.x + rect.width ) {
+					testPointX = rect.x + rect.width;
+				}
+
+				if ( testPointY < rect.y ) {
+					testPointY = rect.y;
+				}
+				else if ( testPointY > rect.y + rect.height ) {
+					testPointY = rect.y + rect.height;
+				}
+
+				return Math.pow( circle.x - testPointX, 2 ) +
+							 Math.pow( circle.y - testPointY, 2 ) <=
+							 Math.pow( circle.radius, 2 );
+
+			},
+
+			// This will be a general update to some components in case of resize
+
+			update() {
+
+					// Background
+
+					this.background.width = canvasWidth;
+					this.background.height = canvasHeight;
+
+					// In case of resize
+
+					if ( this.background.y1 > this.background.y2 ) {
+						this.background.y1 = this.background.y2 + canvasHeight;
+					}
+					else {
+						this.background.y2 = this.background.y1 + canvasHeight;
+					}
+
+			}
+
+		},
+
+		// Audio related
+
+		audio: {
+			currentTrack: null,
+			currentGain: null,
+			currentStereo: null,
+			currentTrackGainValue: .5,
+			currentSEGainValue: .5,
+			currentStereoValue: 0,
+			userTrackGainValue: .5,
+			userSEGainValue: .5,
+			transitionFinished: false,
+
+			// Method to start playing a track or effect
+
+			playSound(buffer, loop, isTrack, isShot = false) {
+
+				// Yes, I'm using the WebAudio API in case you haven't noticed
+
+				// Building audio graph
+
+				const audioSource = audioCtx.createBufferSource();
+				audioSource.buffer = buffer;
+				audioSource.loop = loop;
+
+				// Effect for shots
+
+				if ( isShot ) {
+					audioSource.playbackRate.value = .5 + Math.random();
+				}
+
+				// Creating gain, stereo and compressor
+
+				const audioGain = audioCtx.createGain(),
+					stereoPan = audioCtx.createStereoPanner(),
+					compressor = audioCtx.createDynamicsCompressor();
+
+				// Settings
+
+				if ( isTrack ) {
+
+					// References to change audio
+
+					gameObject.audio.currentTrack = audioSource;
+					gameObject.audio.currentGain = audioGain;
+					gameObject.audio.currentStereo = stereoPan;
+					audioGain.gain.value = gameObject.audio.currentTrackGainValue;
+				}
+				else {
+					audioGain.gain.value = gameObject.audio.currentSEGainValue;
+				}
+
+				stereoPan.pan.value = gameObject.audio.currentStereoValue;
+
+				// Connecting things up
+
+				audioSource.connect( stereoPan );
+				stereoPan.connect( audioGain );
+				audioGain.connect( compressor );
+				compressor.connect( audioCtx.destination );
+
+				audioSource.start();		// Finally -.-
+
+			},
+
+			// This method will change tracks on transitions
+
+			changeTrack(buffer, loop, turnDown, canChange) {
+
+				if ( turnDown && this.currentTrackGainValue > 0 ) {
+
+					gameObject.audio.currentTrackGainValue -= .01;
+					gameObject.audio.updateGain();
+
+					if ( gameObject.audio.currentTrackGainValue <= 0 ) {
+						window.requestAnimationFrame( function callChange() {
+							gameObject.audio.changeTrack( buffer, loop, false, true );
+						} );
+					}
+					else {
+						window.requestAnimationFrame( function callChange() {
+							gameObject.audio.changeTrack( buffer, loop, true, false );
+						} );
+					}
+
+				}
+				else if ( canChange ) {
+
+					gameObject.audio.playSound( buffer, loop, true );
+
+					// To turn up volume
+
+					window.requestAnimationFrame( function turnUpVolume() {
+						gameObject.audio.changeTrack( null, null, false, false );
+					} );
+
+				}
+				else if ( gameObject.audio.currentTrackGainValue <
+									gameObject.audio.userTrackGainValue      ) {
+
+					gameObject.audio.currentTrackGainValue += .01;
+					gameObject.audio.updateGain();
+
+					window.requestAnimationFrame( function turnUpVolume() {
+						gameObject.audio.changeTrack( null, null, false, false );
+					} );
+
+				}
+				else {
+					gameObject.audio.transitionFinished = true;
+				}
+
+			},
+
+			// Method to update gain values
+
+			updateGain(isUser = false) {
+
+				// If we will assign the value of the user gain or current ones
+
+				if ( isUser ) {
+
+					// Rounding values because of JS float accuracy problems
+
+					this.userTrackGainValue =
+					Math.round( this.userTrackGainValue * 100 ) / 100;
+					this.userSEGainValue = 
+					Math.round( this.userSEGainValue * 100 ) / 100;
+					this.currentTrackGainValue = this.userTrackGainValue;
+					this.currentSEGainValue = this.userSEGainValue;
+
+				}
+				else {
+
+					this.currentTrackGainValue =
+					Math.round( this.currentTrackGainValue * 100 ) / 100;
+
+				}
+
+				// Music only, as effects are too quick for we to reference them
+
+				this.currentGain.gain.value = this.currentTrackGainValue;
+
+			}
+
+		},
+
 		// Screen object to handle screen transitions and conditions
 
 		screen: {
@@ -198,6 +2010,15 @@ window.addEventListener( 'load', function startScript() {
 			onOptionScreen: false,
 			onHowToScreen: false,
 			onCreditScreen: false,
+			onGameOverScreen: false,
+
+			// Transitions properties for screen fade effect
+
+			transitionStarted: false,
+			transitionReady: false,
+			transitionFinished: false,
+			transitionAlphaColor: 0,			// For rgba values
+
 
 			// Method to change screen booleans easily
 
@@ -212,6 +2033,49 @@ window.addEventListener( 'load', function startScript() {
 				}
 
 				gameObject.screen[newScreen] = true;
+
+			},
+
+			// Method for screen transitions
+
+			transitionScreen() {
+
+				if ( !gameObject.screen.transitionStarted ) {
+					gameObject.screen.transitionStarted = true;
+				}
+				else if ( !gameObject.screen.transitionReady )  {
+
+					gameObject.screen.transitionAlphaColor += .01;
+					this.transitionAlphaColor =
+					Math.round( this.transitionAlphaColor * 100 ) / 100;
+
+					if ( gameObject.screen.transitionAlphaColor >= 1 ) {
+						gameObject.screen.transitionReady = true;
+					}
+
+				}
+				else if ( !gameObject.screen.transitionFinished ) {
+
+					gameObject.screen.transitionAlphaColor -= .01;
+					this.transitionAlphaColor =
+					Math.round( this.transitionAlphaColor * 100 ) / 100;
+
+					if ( gameObject.screen.transitionAlphaColor <= 0 ) {
+						gameObject.screen.transitionFinished = true;
+					}
+
+				}
+				else { // Restarting for next transition if any
+
+					gameObject.screen.transitionStarted = false;
+					gameObject.screen.transitionReady = false;
+					gameObject.screen.transitionFinished = false;
+
+				}
+
+				// Drawing it
+
+				gameObject.graphics.drawTransition();
 
 			}
 
@@ -245,7 +2109,7 @@ window.addEventListener( 'load', function startScript() {
 				// Level 2 images
 
 				const imgsLevel2 = [
-					'./media/images/background-level-2.png',
+					'./media/images/background-level-2.gif',
 					'./media/images/boss-level-2.png',
 					'./media/images/enemy-ship-3.png',
 					'./media/images/enemy-ship-4.png'
@@ -415,78 +2279,11 @@ window.addEventListener( 'load', function startScript() {
 			}
 		},
 
-		// Media resources
+		/* UPDATE: it's better to leave this section for interface only,
+		 * as components don't suit their functionality
+		 */
 
-		media: {
-			gameTracks: [], // game-over | victory | boss | title | level-1 | level-2
-
-			gameSE: [],     // power-up | p-shot-2 | enemy-shot | p-shot-3 -->
-											// p-shot-1
-
-			gameImages: [], // bg-1 | boss-1 | enemy-1 | enemy-2 | player | bg-2 -->
-										  // boss-2 | enemy-3 | enemy-4
-		},
-
-		// Audio related
-
-		audio: {
-			currentTrack: null,
-			currentGain: null,
-			currentStereo: null,
-			currentTrackGainValue: .5,
-			currentSEGainValue: .5,
-			currentStereoValue: 0,
-
-			// Method to start playing a track or effect
-
-			playSound(buffer, loop, isTrack) {
-
-				// Yes, I'm using the WebAudio API in case you haven't noticed
-
-				// Building audio graph
-
-				const audioSource = audioCtx.createBufferSource();
-				audioSource.buffer = buffer;
-				audioSource.loop = loop;
-
-				// Creating gain, stereo and compressor
-
-				const audioGain = audioCtx.createGain(),
-					stereoPan = audioCtx.createStereoPanner(),
-					compressor = audioCtx.createDynamicsCompressor();
-
-				// Settings
-
-				if ( isTrack ) {
-
-					// References to change audio
-
-					gameObject.audio.currentTrack = audioSource;
-					gameObject.audio.currentGain = audioGain;
-					gameObject.audio.currentStereo = stereoPan;
-					audioGain.gain.value = gameObject.audio.currentTrackGainValue;
-				}
-				else {
-					audioGain.gain.value = gameObject.audio.currentSEGainValue;
-				}
-
-				stereoPan.pan.value = gameObject.audio.currentStereoValue;
-
-				// Connecting things up
-
-				audioSource.connect( stereoPan );
-				stereoPan.connect( audioGain );
-				audioGain.connect( compressor );
-				compressor.connect( audioCtx.destination );
-
-				audioSource.start();		// Finally -.-
-
-			}
-		},
-
-		// Game components such as player, enemies, intro text, etc.
-
-		components: {
+		interface: {
 
 			// Intro object to show game story
 
@@ -646,8 +2443,8 @@ window.addEventListener( 'load', function startScript() {
 
 					// Getting mouse position and creating alias
 
-					const mousePos = gameObject.components.mouse.getMousePosition( e ),
-						box = gameObject.components.title;
+					const mousePos = gameObject.interface.mouse.getMousePosition( e ),
+						box = gameObject.interface.title;
 
 					return mousePos.x >= box.containersX &&
 								 mousePos.x <= box.containersX + box.containersWidth &&
@@ -665,7 +2462,7 @@ window.addEventListener( 'load', function startScript() {
 
 					this.containers.forEach( function highlightOption(option) {
 						
-						if ( gameObject.components.title.isOptionActive( option, e ) &&
+						if ( gameObject.interface.title.isOptionActive( option, e ) &&
 							   window.innerWidth > 768 ) // Only for large viewports
 							{
 								option.isOnHover = true;
@@ -678,10 +2475,10 @@ window.addEventListener( 'load', function startScript() {
 					} );
 
 					if ( result ) {
-						gameObject.components.mouse.toPointer();
+						gameObject.interface.mouse.toPointer();
 					}
 					else {
-						gameObject.components.mouse.toDefault();
+						gameObject.interface.mouse.toDefault();
 					}
 
 				},
@@ -692,9 +2489,9 @@ window.addEventListener( 'load', function startScript() {
 
 					this.containers.forEach( function changeToScreen(option) {
 
-						if ( gameObject.components.title.isOptionActive( option, e ) ) {
+						if ( gameObject.interface.title.isOptionActive( option, e ) ) {
 							gameObject.screen.changeScreen( option.path );
-							gameObject.components.mouse.toDefault();
+							gameObject.interface.mouse.toDefault();
 							option.isOnHover = false;
 						}
 
@@ -753,16 +2550,14 @@ window.addEventListener( 'load', function startScript() {
 
 							if ( gameObject.audio.currentTrackGainValue < 1 ) {
 
-								gameObject.audio.currentTrackGainValue += .1;
-								gameObject.audio.currentTrackGainValue =
-								Math.round(	gameObject.audio.currentTrackGainValue * 10 ) / 10;
-								gameObject.audio.currentGain.gain.value =
-								gameObject.audio.currentTrackGainValue;
-								gameObject.components.options.buttons[1].canDraw = true;
+								gameObject.audio.userTrackGainValue += .1;
+								gameObject.audio.updateGain( true );
+								gameObject.interface.options.buttons[1].canDraw = true;
 
 								if ( gameObject.audio.currentTrackGainValue >= 1 ) {
 									this.canDraw = false;
 								}
+
 							}
 
 						}
@@ -774,16 +2569,14 @@ window.addEventListener( 'load', function startScript() {
 
 							if ( gameObject.audio.currentTrackGainValue > 0 ) {
 
-								gameObject.audio.currentTrackGainValue -= .1;
-								gameObject.audio.currentTrackGainValue =
-								Math.round(	gameObject.audio.currentTrackGainValue * 10 ) / 10;
-								gameObject.audio.currentGain.gain.value =
-								gameObject.audio.currentTrackGainValue;
-								gameObject.components.options.buttons[0].canDraw = true;
+								gameObject.audio.userTrackGainValue -= .1;
+								gameObject.audio.updateGain( true );
+								gameObject.interface.options.buttons[0].canDraw = true;
 
 								if ( gameObject.audio.currentTrackGainValue <= 0 ) {
 									this.canDraw = false;
 								}
+
 							}
 
 						}
@@ -795,14 +2588,20 @@ window.addEventListener( 'load', function startScript() {
 
 							if ( gameObject.audio.currentSEGainValue < 1 ) {
 
-								gameObject.audio.currentSEGainValue += .1;
-								gameObject.audio.currentSEGainValue =
-								Math.round( gameObject.audio.currentSEGainValue * 10 ) / 10;
-								gameObject.components.options.buttons[3].canDraw = true;
+								gameObject.audio.userSEGainValue += .1;
+								gameObject.audio.updateGain( true );
+								gameObject.interface.options.buttons[3].canDraw = true;
 
 								if ( gameObject.audio.currentSEGainValue >= 1 ) {
 									this.canDraw = false;
 								}
+
+								// Playing example sound
+
+								gameObject.audio.playSound(
+									gameObject.media.gameSE[0],
+									false, false, false
+								);
 
 							}
 
@@ -815,14 +2614,20 @@ window.addEventListener( 'load', function startScript() {
 
 							if ( gameObject.audio.currentSEGainValue > 0 ) {
 
-								gameObject.audio.currentSEGainValue -= .1;
-								gameObject.audio.currentSEGainValue =
-								Math.round( gameObject.audio.currentSEGainValue * 10 ) / 10;
-								gameObject.components.options.buttons[2].canDraw = true;
+								gameObject.audio.userSEGainValue -= .1;
+								gameObject.audio.updateGain( true );
+								gameObject.interface.options.buttons[2].canDraw = true;
 
 								if ( gameObject.audio.currentSEGainValue <= 0 ) {
 									this.canDraw = false;
 								}
+
+								// Playing example sound
+
+								gameObject.audio.playSound(
+									gameObject.media.gameSE[0],
+									false, false, false
+								);
 
 							}
 
@@ -841,7 +2646,7 @@ window.addEventListener( 'load', function startScript() {
 					 * if it means create extra work with little to no benefit
 					 */
 
-					const mousePos = gameObject.components.mouse.getMousePosition( e );
+					const mousePos = gameObject.interface.mouse.getMousePosition( e );
 
 					if ( mousePos.x >= this.generalBtn.x &&
 							 mousePos.x <= this.generalBtn.x + this.generalBtn.width &&
@@ -861,7 +2666,7 @@ window.addEventListener( 'load', function startScript() {
 
 					this.buttons.forEach( function checkButtonState(button) {
 
-						if ( gameObject.components.options.isButtonActive( button, e ) &&
+						if ( gameObject.interface.options.isButtonActive( button, e ) &&
 								 window.innerWidth > 768 ) {
 							button.isActive = true;
 							result = true;
@@ -875,15 +2680,15 @@ window.addEventListener( 'load', function startScript() {
 					// Handling back btn here to avoid mouse pointer issues
 
 					if ( !result ) {
-						gameObject.components.backBtn.handleHover( e );
-						result = gameObject.components.backBtn.isActive;
+						gameObject.interface.backBtn.handleHover( e );
+						result = gameObject.interface.backBtn.isActive;
 					}
 
 					if ( result ) {
-						gameObject.components.mouse.toPointer();
+						gameObject.interface.mouse.toPointer();
 					}
 					else {
-						gameObject.components.mouse.toDefault();	
+						gameObject.interface.mouse.toDefault();	
 					}
 
 				},
@@ -898,7 +2703,7 @@ window.addEventListener( 'load', function startScript() {
 
 					this.buttons.forEach( function checkButtonState(button) {
 
-						if ( gameObject.components.options.isButtonActive( button, e ) ) {
+						if ( gameObject.interface.options.isButtonActive( button, e ) ) {
 							button.action();
 						}
 
@@ -971,7 +2776,7 @@ window.addEventListener( 'load', function startScript() {
 				// This will check if click was on back button
 
 				isOnBackBtn(e) {	// e is always what I use for event parameters
-					const mousePos = gameObject.components.mouse.getMousePosition( e );
+					const mousePos = gameObject.interface.mouse.getMousePosition( e );
 
 					return mousePos.x >= this.x && 
 								 mousePos.x <= this.x + this.width &&
@@ -984,11 +2789,11 @@ window.addEventListener( 'load', function startScript() {
 
 					if ( this.isOnBackBtn( e ) && window.innerWidth > 768 ) {
 						this.isActive = true;
-						gameObject.components.mouse.toPointer();
+						gameObject.interface.mouse.toPointer();
 					}
 					else {
 						this.isActive = false;
-						gameObject.components.mouse.toDefault();
+						gameObject.interface.mouse.toDefault();
 					}
 
 				},
@@ -998,7 +2803,7 @@ window.addEventListener( 'load', function startScript() {
 				toTitle() {
 
 					this.isActive = false;
-					gameObject.components.mouse.toDefault();
+					gameObject.interface.mouse.toDefault();
 					gameObject.screen.changeScreen( 'onTitleScreen' );
 
 				},
@@ -1088,7 +2893,32 @@ window.addEventListener( 'load', function startScript() {
 					ctx.fillRect( 0, 0, canvasWidth, canvasHeight );
 				}
 				else {
-					// Do Playing code here...
+
+					// Drawing backgrounds
+
+					const img = document.createElement( 'img' );
+
+					if ( !gameObject.state.level1.finished ) {
+						img.src = gameObject.media.gameImages[0];
+					}
+					else if ( !gameObject.state.level2.finished ) {
+						img.src = 'https://cdn.tutsplus.com/active/uploads/legacy/tuts/421_stage3dShmup2/stars.gif';
+					}
+					
+					[
+						gameObject.components.background.y1,
+						gameObject.components.background.y2
+					].forEach( function drawBackground(y) {
+
+						ctx.drawImage(
+							img, 
+							gameObject.components.background.x, y,
+							gameObject.components.background.width, 
+							gameObject.components.background.height
+						);
+
+					} )
+
 				}
 
 				ctx.restore();
@@ -1102,21 +2932,21 @@ window.addEventListener( 'load', function startScript() {
 				ctx.save();
 
 				ctx.font =
-				`${ gameObject.components.intro.textSize }px Sedgwick Ave Display`;
+				`${ gameObject.interface.intro.textSize }px Sedgwick Ave Display`;
 				ctx.fillStyle = '#fff';
 				
 
 				// This will rearrange the text on screen if any of them overflow
 
-				gameObject.components.intro.arrangeText();
+				gameObject.interface.intro.arrangeText();
 
-				gameObject.components.intro.text.forEach(
+				gameObject.interface.intro.text.forEach(
 					function fillText(txt, index) {
 						ctx.fillText(
 							txt,
-							gameObject.components.intro.x,
-							gameObject.components.intro.y +
-							gameObject.components.intro.textSize * index
+							gameObject.interface.intro.x,
+							gameObject.interface.intro.y +
+							gameObject.interface.intro.textSize * index
 						);
 					}
 				);
@@ -1135,24 +2965,24 @@ window.addEventListener( 'load', function startScript() {
 
 				ctx.textAlign = 'center';
 				ctx.font =
-				`${ gameObject.components.title.titleSize }px Sedgwick Ave Display`;
+				`${ gameObject.interface.title.titleSize }px Sedgwick Ave Display`;
 				ctx.fillStyle = '#fff';
 				ctx.fillText(
 					'SPACE',
-					gameObject.components.title.x,
-					gameObject.components.title.y
+					gameObject.interface.title.x,
+					gameObject.interface.title.y
 				);
 				ctx.fillStyle = '#a00';
 				ctx.fillText(
 					'SHOOTER',
-					gameObject.components.title.x,
-					gameObject.components.title.y * 2
+					gameObject.interface.title.x,
+					gameObject.interface.title.y * 2
 				);
 
 
 				// Drawing containers
 
-				gameObject.components.title.containers.forEach(
+				gameObject.interface.title.containers.forEach(
 					function drawContainers(container, index) {
 
 						// Variables for box and text colors
@@ -1174,15 +3004,15 @@ window.addEventListener( 'load', function startScript() {
 						ctx.fillStyle = boxColor;
 
 						ctx.fillRect(
-							gameObject.components.title.containersX,
-							container.textY - gameObject.components.title.containersOffsetY,
-							gameObject.components.title.containersWidth,
-							gameObject.components.title.containersHeight
+							gameObject.interface.title.containersX,
+							container.textY - gameObject.interface.title.containersOffsetY,
+							gameObject.interface.title.containersWidth,
+							gameObject.interface.title.containersHeight
 						);
 
 						ctx.fillStyle = textColor;
 						ctx.font =
-						`${ gameObject.components.title.optionsSize }px Joti One`;
+						`${ gameObject.interface.title.optionsSize }px Joti One`;
 
 						ctx.fillText(
 							container.text,
@@ -1370,7 +3200,7 @@ window.addEventListener( 'load', function startScript() {
 
 				// Drawing buttons to turn up or down audio volume
 
-				gameObject.components.options.buttons.forEach(
+				gameObject.interface.options.buttons.forEach(
 					function drawButton(button, index) {
 
 						if ( button.canDraw ) {
@@ -1381,7 +3211,7 @@ window.addEventListener( 'load', function startScript() {
 
 							// Alias
 
-							const generalBtn = gameObject.components.options.generalBtn;
+							const generalBtn = gameObject.interface.options.generalBtn;
 
 							if ( button.isActive ) {
 								textColor = generalBtn.textHoverColor;
@@ -1431,6 +3261,36 @@ window.addEventListener( 'load', function startScript() {
 
 			},
 
+			// Drawing screen transition
+
+			drawTransition() {
+
+				ctx.save();
+
+				ctx.fillStyle = 
+				`rgba( 17, 17, 17, ${ gameObject.screen.transitionAlphaColor } )`;
+				ctx.fillRect( 0, 0, canvasWidth, canvasHeight );
+
+				/* Drawing game over text, in this case will be a
+				 * game over transition
+				 */
+
+				if ( gameObject.state.gameOver.inTransition ||
+				     gameObject.state.gameOver.started ) {
+
+					ctx.fillStyle = 
+					`rgba( 170, 0, 0, ${ gameObject.screen.transitionAlphaColor })`;
+					ctx.font = `${ canvasWidth * .12 }px Sedgwick Ave Display`;
+					ctx.textAlign = 'center';
+					ctx.textBaseline = 'middle';
+					ctx.fillText( 'Game Over', canvasWidth / 2, canvasHeight / 2 );
+
+				}
+
+				ctx.restore();
+
+			},
+
 			drawBackBtn() {
 
 				ctx.save();
@@ -1442,7 +3302,7 @@ window.addEventListener( 'load', function startScript() {
 
 				// Back button alias
 
-				const backBtn = gameObject.components.backBtn;
+				const backBtn = gameObject.interface.backBtn;
 
 				if ( backBtn.isActive ) {
 					boxColor = backBtn.bgHoverColor;
@@ -1472,6 +3332,374 @@ window.addEventListener( 'load', function startScript() {
 
 				ctx.restore();
 
+			},
+
+			drawPlayer() {
+
+
+				ctx.save();
+
+				if ( gameObject.components.player.deathAnimationCanDraw ) {
+
+					const img = document.createElement( 'img' );
+					img.src = gameObject.media.gameImages[4];
+
+					ctx.drawImage(
+						img,
+						gameObject.components.player.x,
+						gameObject.components.player.y,
+						gameObject.components.player.width,
+						gameObject.components.player.height
+					);
+
+				ctx.restore();
+
+				}
+
+			},
+
+			// Drawing game enemies
+
+			drawEnemies() {
+
+				ctx.save();
+
+				const img = document.createElement( 'img' );
+
+				// Drawing for commmon enemies and bosses
+
+				[
+					gameObject.components.enemies.list,
+					gameObject.components.enemies.bosses
+				].forEach( function accessEnemyList(enemyList) {
+
+						enemyList.forEach(
+
+							function drawEnemies(enemy) {
+
+								if ( enemy.deathAnimationCanDraw ) {
+
+									switch( enemy.type ) {
+
+										case 1:
+											img.src = gameObject.media.gameImages[2];
+											break;
+										case 2:
+											img.src = gameObject.media.gameImages[3];
+											break;
+										case 5:
+											img.src = gameObject.media.gameImages[1];
+											break;
+										default:
+											console.log( 'Unknown enemy image type' );
+
+									}
+
+									ctx.save();
+									ctx.translate(
+										enemy.collisionCircle.x,
+										enemy.collisionCircle.y
+									);
+
+									/* We add and extra angle to rotate the image down
+									 * and keep it in sync with the canvas coordinate system.
+									 * We could also rotate the images, but this is easier 
+									 * for now.
+									 */
+
+									if ( enemy.type === 1 || enemy.type === 2 ||
+									     enemy.type === 3 )
+									{
+										ctx.rotate( enemy.angle + Math.PI / 2 );	
+									}
+									else {
+										ctx.rotate( enemy.angle );
+									}
+
+									ctx.drawImage(
+										img,
+										-enemy.width / 2,
+										-enemy.height / 2,
+										enemy.width,
+										enemy.height
+									);
+
+									ctx.restore();
+
+								}
+
+						} );
+
+				}	);
+
+				ctx.restore();
+
+			},
+
+			// Drawing all game shots
+
+			drawShots() {
+
+				ctx.save();
+
+				// Player shots
+
+				gameObject.components.player.shots.forEach(
+
+					function drawPlayerShots(shot) {
+
+						const shotGrad = ctx.createRadialGradient(
+							shot.x, shot.y, 3,
+							shot.x, shot.y, shot.radius
+						);
+
+						if ( shot.type === 1 ) {
+							shotGrad.addColorStop( 0, 'orange' );
+							shotGrad.addColorStop( 1, '#a00' );	
+						}
+						else if ( shot.type === 2 ) {
+							shotGrad.addColorStop( 0, '#004' );
+							shotGrad.addColorStop( 1, '#00c' );	
+						}
+						else {
+							shotGrad.addColorStop( 0, '#fff' );
+							shotGrad.addColorStop( .1, '#ccc' );
+							shotGrad.addColorStop( .3, '#999' );
+							shotGrad.addColorStop( 1, '#000');
+						}
+
+						ctx.beginPath();
+						ctx.fillStyle = shotGrad;
+						ctx.arc( shot.x, shot.y, shot.radius, 0, 2 * Math.PI );
+						ctx.fill();
+
+					}
+
+				);
+
+				// Enemy shots
+
+				gameObject.components.enemies.shots.forEach(
+
+					function drawEnemyShot(shot) {
+
+						switch ( shot.type ) {
+
+							case 1:
+							case 5:
+
+								let gradientRadius,
+									shotGrad;
+
+								if ( shot.type === 1 ) {
+									gradientRadius = 3;
+								}
+								else if ( shot.type === 5 ) {
+									gradientRadius = shot.radius / 2;
+								}
+
+								shotGrad = ctx.createRadialGradient(
+									shot.x, shot.y, gradientRadius,
+									shot.x, shot.y, shot.radius
+								);
+
+								if ( shot.type === 1 ) {
+									shotGrad.addColorStop( 0, '#fff' );
+									shotGrad.addColorStop( .5, '#0a0' );
+									shotGrad.addColorStop( 1, '#0c0' );
+								}
+								else if ( shot.type === 5 ) {
+									shotGrad.addColorStop( 0, '#ff0' );
+									shotGrad.addColorStop( .5, '#ca0' );
+									shotGrad.addColorStop( 1, '#a00' );
+								}
+
+								
+
+								ctx.beginPath();
+								ctx.fillStyle = shotGrad;
+								ctx.arc( shot.x, shot.y, shot.radius, 0, 2 * Math.PI );
+								ctx.fill();
+
+								break;
+
+							case 2:
+
+								ctx.fillStyle = '#33f';
+
+								ctx.save();
+								ctx.translate(
+									shot.x + shot.width / 2,
+									shot.y + shot.height / 2
+								);
+								ctx.rotate( shot.angle + Math.PI / 2 );
+								ctx.fillRect( 0, 0, shot.width, shot.height );
+								ctx.restore();
+
+								break;
+
+							default:
+								console.log( 'Unknown shot type' );
+
+						}
+
+					}
+
+				);
+
+				ctx.restore();
+
+			},
+
+			// Drawing player power ups
+
+			drawPowerUps() {
+
+				ctx.save();
+
+				gameObject.components.powerUps.list.forEach(
+
+					function drawPowerUp(powerUp) {
+
+						ctx.fillStyle = '#fff';
+						ctx.fillRect(
+							powerUp.x, powerUp.y,
+							powerUp.width, powerUp.height
+						);
+
+						if ( powerUp.type === 1 || powerUp.type === 2 ||
+								 powerUp.type === 3 )
+						{
+
+							const shotGrad = ctx.createRadialGradient(
+								powerUp.x + powerUp.width / 2,
+								powerUp.y + powerUp.height / 2,
+								3,
+								powerUp.x + powerUp.width / 2,
+								powerUp.y + powerUp.height / 2,
+								powerUp.width * .4,
+							);
+
+							if ( powerUp.type === 1 ) {
+								shotGrad.addColorStop( 0, 'orange' );
+								shotGrad.addColorStop( 1, '#a00' );	
+							}
+							else if ( powerUp.type === 2 ) {
+								shotGrad.addColorStop( 0, '#004' );
+								shotGrad.addColorStop( 1, '#00c' );	
+							}
+							else {
+								shotGrad.addColorStop( 0, '#fff' );
+								shotGrad.addColorStop( .1, '#ccc' );
+								shotGrad.addColorStop( .3, '#999' );
+								shotGrad.addColorStop( 1, '#000');
+							}
+
+							ctx.beginPath();
+							ctx.fillStyle = shotGrad;
+							ctx.arc(
+								powerUp.x + powerUp.width / 2,
+								powerUp.y + powerUp.height / 2,
+								powerUp.width * .4,
+								0, Math.PI * 2
+							);
+							ctx.fill();
+
+						}
+						else if ( powerUp.type === 4 ) {
+
+							const img = document.createElement( 'img' );
+							img.src = gameObject.media.gameImages[4];
+
+							ctx.drawImage(
+								img,
+								powerUp.x + powerUp.width * .1,
+								powerUp.y + powerUp.height * .1,
+								powerUp.width * .8,
+								powerUp.height * .8
+							);
+
+						}
+						else {
+
+							ctx.fillStyle = '#cc0';
+							ctx.font = `${ powerUp.width * .8 }px Sedgwick Ave Display`;
+							ctx.textAlign = 'center';
+							ctx.textBaseline = 'middle';
+
+							ctx.fillText(
+								'S',
+								powerUp.x + powerUp.width / 2,
+								powerUp.y + powerUp.height / 2 + 3
+							);
+
+						}
+
+					}
+
+				);
+
+				ctx.restore();
+
+			},
+
+			// This will draw player score and lives
+
+			drawInfo() {
+
+				ctx.save();
+
+				// Image for player lives
+
+				const img = document.createElement( 'img' );
+				img.src = gameObject.media.gameImages[4];
+
+				ctx.font = `${ canvasWidth * .06 }px Sedgwick Ave Display`;
+				ctx.fillStyle = '#fff';
+				ctx.textAlign = 'left';
+				ctx.fillText( 'Lives:', canvasWidth * .1, canvasHeight * .1 );
+				ctx.textAlign = 'right';
+				ctx.fillText( 'Score:', canvasWidth * .9, canvasHeight * .1 );
+
+				// Score
+
+				ctx.fillText(
+					gameObject.components.player.score,
+					canvasWidth * .9,
+					canvasHeight * .2
+				);
+
+				// Lives
+
+				for ( let i = 0; i < gameObject.components.player.lives; i++ ) {
+					ctx.drawImage(
+						img,
+						canvasWidth * .1 + i * canvasWidth * .08,
+						canvasHeight * .15,
+						30, 30
+					);
+				}
+
+				ctx.restore();
+
+			},
+
+			drawGameOver() {
+
+				ctx.save();
+
+				ctx.fillStyle = '#111';
+				ctx.fillRect( 0, 0, canvasWidth, canvasHeight );
+
+				ctx.fillStyle = 
+				`rgba( 170, 0, 0, ${ gameObject.screen.transitionAlphaColor })`;
+				ctx.font = `${ canvasWidth * .12 }px Sedgwick Ave Display`;
+				ctx.textAlign = 'center';
+				ctx.textBaseline = 'middle';
+				ctx.fillText( 'Game Over', canvasWidth / 2, canvasHeight / 2 );
+
+				ctx.restore();
+
 			}
 
 		}
@@ -1489,7 +3717,7 @@ window.addEventListener( 'load', function startScript() {
 		if ( gameObject.screen.onTitleScreen ) {
 			// Request a frame for optimization
 			window.requestAnimationFrame( function callHandler() {
-				gameObject.components.title.handleHover( e );
+				gameObject.interface.title.handleHover( e );
 			} );
 		}
 		else if ( gameObject.screen.onCreditScreen ||
@@ -1503,10 +3731,10 @@ window.addEventListener( 'load', function startScript() {
 					 * pointer issues
 					 */
 
-					gameObject.components.options.handleHover( e );
+					gameObject.interface.options.handleHover( e );
 				}
 				else {
-					gameObject.components.backBtn.handleHover( e );
+					gameObject.interface.backBtn.handleHover( e );
 				}
 			} );	
 		}
@@ -1529,23 +3757,23 @@ window.addEventListener( 'load', function startScript() {
 
 			case gameObject.screen.onTitleScreen:
 
-				gameObject.components.title.handleTitleClick( e );
+				gameObject.interface.title.handleTitleClick( e );
 				break;
 
 			case gameObject.screen.onCreditScreen ||
 					 gameObject.screen.onHowToScreen ||
 					 gameObject.screen.onOptionScreen:
 
-				if ( gameObject.components.backBtn.isOnBackBtn( e ) ) {
-					gameObject.components.backBtn.toTitle();
+				if ( gameObject.interface.backBtn.isOnBackBtn( e ) ) {
+					gameObject.interface.backBtn.toTitle();
 				}
 				else if ( gameObject.screen.onOptionScreen ) {
-					gameObject.components.options.handleOptionsClick( e );
+					gameObject.interface.options.handleOptionsClick( e );
 				}
 				break;
 
 			default:
-				console.log( 'No screen!!' );
+				break;
 
 		}
 
@@ -1560,6 +3788,66 @@ window.addEventListener( 'load', function startScript() {
 		}
 
 	} );
+
+	// These will take care of player control on keyboard
+
+	window.addEventListener( 'keydown', function startControl(e) {
+
+		// Just modifying states
+
+		if ( gameObject.components.player.allowPlayer ) {
+
+			if ( e.key === 'w' || e.key === 'W' ) {
+				gameObject.components.player.movingUp = true;
+			}
+
+			if ( e.key === 'd' || e.key === 'D' ) {
+				gameObject.components.player.movingRight = true;
+			}
+
+			if ( e.key === 'a' || e.key === 'A' ) {
+				gameObject.components.player.movingLeft = true;
+			}
+
+			if ( e.key === 's' || e.key === 'S' ) {
+				gameObject.components.player.movingDown = true;
+			}
+
+			if ( e.key === 'k' || e.key === 'K' || e.key === ' ') {
+				gameObject.components.player.shooting = true;
+			}
+
+		}
+
+	} );
+
+	window.addEventListener( 'keyup', function endControl(e) {
+		
+		if ( gameObject.components.player.allowPlayer ) {
+
+			if ( e.key === 'w' || e.key === 'W' ) {
+				gameObject.components.player.movingUp = false;
+			}
+
+			if ( e.key === 'd' || e.key === 'D' ) {
+				gameObject.components.player.movingRight = false;
+			}
+
+			if ( e.key === 'a' || e.key === 'A' ) {
+				gameObject.components.player.movingLeft = false;
+			}
+
+			if ( e.key === 's' || e.key === 'S' ) {
+				gameObject.components.player.movingDown = false;
+			}
+
+			if ( e.key === 'k' || e.key === 'K' || e.key === ' ') {
+				gameObject.components.player.shooting = false;
+			}
+
+		}
+
+	} )
 
 	gameManager.startGame();
 
