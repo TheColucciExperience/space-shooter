@@ -1,6 +1,28 @@
 
 /* Space shooter styles */
 
+/* Animations for small viewports */
+
+@keyframes showMessageBox {
+	from { transform: translate(0, -100px);  }
+	to { transform: translate(0, 0); }
+}
+
+@keyframes hideMessageBox {
+	from { transform: translate(0, 0);  }
+	to { transform: translate(0, -100px);  }
+}
+
+@keyframes showSmallController {
+	from { transform: translate(0, 100px); }
+	to { transform: translate(0, 0); }
+}
+
+@keyframes hideSmallController {
+	from { transform: translate(0, 0);  }
+	to { transform: translate(0, 100px); }
+}
+
 /* Setting initial width and height to page */
 
 html,
@@ -12,6 +34,80 @@ body {
 /* Body default background color */
 
 body { background-color: #111; }
+
+/* Message container styles, to advise player about small controller.
+ * Will be used mainly for positioning
+ */
+
+.small-message-container {
+	position: fixed;
+	z-index: 10;
+	top: 0;
+	left: 0;
+	display: none;
+	width: 100vw;
+	padding: 5vh 5vw;
+}
+
+.small-message-container > p {
+	max-width: 500px;
+	margin-right: auto;
+	margin-left: auto;
+	padding: .2rem;
+	font-family: 'Sedgwick Ave Display', cursive;
+	font-size: 1.4rem;
+	text-align: center;
+	color: #fff;
+	background-color: #333;
+}
+
+/* Small controller styles and positioning. Container will be used for
+ * fixed position and padding
+ */
+
+.small-controller-container {
+	position: fixed;
+	z-index: 10;
+	bottom: 0;
+	left: 0;
+	display: none;
+	width: 100vw;
+	padding: 5vh 5vw;
+}
+
+.small-controller-container > div {
+	display: flex;
+	justify-content: space-between;
+	max-width: 300px;
+	margin-left: auto;
+	margin-right: auto;
+	padding: .4rem .5rem;
+	background-color: rgba(34,34,34,.6);
+	box-shadow: 2px 3px 2px 1px #111;
+}
+
+.small-controller-container > div > button {
+	border: none;
+	border-radius: 50%;
+	width: 3rem;
+	height: 3rem;
+	font-family: 'Joti One', cursive;
+	font-size: 1.4rem;
+	color: #111;
+	background-color: #fff;
+	box-shadow: 1px 2px 1px #000;
+}
+
+/* Hiding message and controller, they're not needed for large viewports */
+
+@media (min-width: 48rem) {
+
+	.small-message-container,
+	.small-controller-container {
+		display: none !important;
+	}
+
+}
 
 /* Canvas centering for medium and large viewports */
 

@@ -177,6 +177,7 @@ window.addEventListener( 'load', function startScript() {
 							gameObject.media.gameTracks[4],
 							true,	true, false
 						);
+						showSmallController();	// For small viewports
 					}
 					else if ( gameObject.state.inTransition ) {
 
@@ -297,6 +298,7 @@ window.addEventListener( 'load', function startScript() {
 									true, true, false
 								);
 								gameObject.screen.changeScreen( 'onEndingScreen' );
+								hideSmallController();
 
 							}
 
@@ -336,6 +338,7 @@ window.addEventListener( 'load', function startScript() {
 								gameObject.state.gameOver.started = true;
 								gameObject.state.resetGame();
 								gameObject.screen.changeScreen( 'onGameOverScreen' );
+								hideSmallController();
 							}
 
 						}
@@ -662,6 +665,16 @@ window.addEventListener( 'load', function startScript() {
 
 					this.y1 += gameObject.time.deltaRate * ( 1 / 3 );
 					this.y2 += gameObject.time.deltaRate * ( 1 / 3 );
+
+					if ( this.y1 >= canvasHeight ) {
+						this.y1 = -canvasHeight;
+					}
+
+					if ( this.y2 >= canvasHeight ) {
+						this.y2 = -canvasHeight;
+					}
+
+
 					
 				}
 
@@ -1869,7 +1882,10 @@ window.addEventListener( 'load', function startScript() {
 
 				}
 
-				if ( this.player.hitPoints <= 0 && !this.player.invincible ) {
+				if ( this.player.hitPoints <= 0 &&
+						 !this.player.invincible &&
+						 this.player.lives > 0 )
+				{
 					this.player.lives--;
 					this.player.invincible = true;
 					window.requestAnimationFrame( this.player.deathAnimate );
@@ -4417,7 +4433,80 @@ window.addEventListener( 'load', function startScript() {
 
 		}
 
-	} )
+	} );
+
+	// This section will handle small viewports interaction
+
+	// Getting DOM elements
+
+	const smallMessageBox = 
+			document.querySelector( '.small-message-container' ),
+		smallControllerBox =
+			document.querySelector( '.small-controller-container' ),
+		leftBtn = document.querySelector( '#leftBtn' ),
+		rightBtn = document.querySelector( '#rightBtn' ),
+		shootBtn = document.querySelector( '#shootBtn' );
+
+	smallMessageBox.style.display = 'block';
+	smallMessageBox.style.animation = 'showMessageBox .4s ease-in forwards';
+
+	// Hiding message after a time not to disturb player
+
+	setTimeout( function hideMessage() {
+
+		smallMessageBox.style.animation = 'hideMessageBox .4s ease-in forwards';
+
+		setTimeout( function hideMessageDisplay() {
+			smallMessageBox.style.display = 'none';
+		}, 400 );
+
+	}, 10000 );
+
+	// Functions to show and hide small controller
+
+	function showSmallController() {
+		smallControllerBox.style.display = 'block';
+		smallControllerBox.style.animation =
+		'showSmallController .4s ease-in forwards';
+	}
+
+	function hideSmallController() {
+		smallControllerBox.style.animation =
+		'hideSmallController .4s ease-in forwards';
+		setTimeout( function hideControllerDisplay() {
+			smallControllerBox.style.display = 'none';
+		}, 400 );
+	}
+
+	// Adding controls to small controller
+
+	// Start actions
+
+	leftBtn.addEventListener( 'touchstart', function moveLeft() {
+		gameObject.components.player.movingLeft = true;
+	} );
+
+	rightBtn.addEventListener( 'touchstart', function moveRight() {
+		gameObject.components.player.movingRight = true;
+	} );
+
+	shootBtn.addEventListener( 'touchstart', function shoot() {
+		gameObject.components.player.shooting = true;
+	} );
+
+	// End actions
+
+	leftBtn.addEventListener( 'touchend', function stopLeft() {
+		gameObject.components.player.movingLeft = false;
+	} );
+
+	rightBtn.addEventListener( 'touchend', function stopRight() {
+		gameObject.components.player.movingRight = false;
+	} );
+
+	shootBtn.addEventListener( 'touchend', function stopShooting() {
+		gameObject.components.player.shooting = false;
+	} );
 
 	gameManager.startGame();
 
