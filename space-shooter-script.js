@@ -59,13 +59,19 @@ window.addEventListener( 'load', function startScript() {
 			gameObject.id = requestAnimationFrame( this.updateGame );
 		},
 
-		// Declared this way to allow recursion (easier than binding gameManager)
+		/* This method will game status by handling game object 
+		 * methods and properties
+		 */
 
-		updateGame: function updater(time) {
-
-			// Update game status by handling game object methods and properties
+		updateGame(time) {
+			
+			if ( gameObject.state.wasPaused ) {
+				gameObject.state.wasPaused = false;
+				gameObject.time.currentTime = time;
+			}
 
 			// Updating time values
+
 
 			gameObject.time.pastTime = gameObject.time.currentTime;
 			gameObject.time.currentTime = time;
@@ -105,16 +111,22 @@ window.addEventListener( 'load', function startScript() {
 
 				case gameObject.screen.onIntroScreen:
 
-					// Drawing intro story
+					gameObject.interface.scrollText.move();
+					gameObject.interface.scrollText.update();
 
-					gameObject.interface.intro.move();
-					gameObject.interface.intro.update();
+					// Drawing scrolling text
+
 					gameObject.graphics.clear();
 					gameObject.graphics.drawBackground();
-					gameObject.graphics.drawIntro();
+					gameObject.graphics.drawScrollText();
 
-					if ( gameObject.interface.intro.finished ) {
+					if ( gameObject.interface.scrollText.finished ) {
+
+						// Reseting properties for ending
+
+						gameObject.interface.scrollText.reset();
 						gameObject.screen.changeScreen( 'onTitleScreen' );
+
 					}
 
 					break;
@@ -154,8 +166,8 @@ window.addEventListener( 'load', function startScript() {
 				case gameObject.screen.onPlayingScreen:
 
 					/* We won't handle everything about the game here for code
-					 * readability and maintenance purposes. Instead for some tasks 
-					 * we'll call a generator if some condition is met.
+					 * readability and maintenance purposes. Instead for most tasks 
+					 * we'll call specific components' methods if some condition is met.
 					 */
 
 					if ( !gameObject.state.started &&
@@ -189,11 +201,21 @@ window.addEventListener( 'load', function startScript() {
 						if ( !gameObject.state.level1.started ) {
 							gameObject.state.level1.started = true;
 						}
+						// Registering victory in level 1
 						else if ( gameObject.state.level1.bossFinished &&
 											!gameObject.state.level1.inVictory &&
 											gameObject.audio.transitionFinished )
 						{
 							gameObject.state.level1.inVictory = true;
+							gameObject.state.victory.intervalReferenceTime =
+							gameObject.time.currentTime;
+						}
+						// Registering victory in level 2
+						else if ( gameObject.state.level2.bossFinished &&
+											!gameObject.state.level2.inVictory &&
+											gameObject.audio.transitionFinished )
+						{
+							gameObject.state.level2.inVictory = true;
 							gameObject.state.victory.intervalReferenceTime =
 							gameObject.time.currentTime;
 						}
@@ -215,7 +237,7 @@ window.addEventListener( 'load', function startScript() {
 						gameObject.graphics.drawInfo();
 
 						/* These will be level transitions that will mainly provide
-						 * a room for the background to change
+						 * a room for the background or screen to change
 						 */
 
 						// Level 1 transition
@@ -246,6 +268,35 @@ window.addEventListener( 'load', function startScript() {
 								// Reseting transition properties
 
 								gameObject.screen.transitionScreen();
+
+							}
+
+						}
+
+						/* Level 2 transition. If there were more levels, this would
+						 * be almost the same as level 1 conditionals. We could even
+						 * write a general check for all of these, but the goal here
+						 * is just to provide a base structure
+						 */
+
+
+						else if ( gameObject.state.level2.inVictory &&
+									    !gameObject.state.level2.finished &&
+									    gameObject.time.currentTime -
+											gameObject.state.victory.intervalReferenceTime >
+											gameObject.state.victory.intervalTime )
+						{
+
+							gameObject.screen.transitionScreen();
+
+							if ( gameObject.screen.transitionReady ) {
+
+								gameObject.state.level2.finished = true;
+								gameObject.audio.changeTrack(
+									gameObject.media.gameTracks[5],
+									true, true, false
+								);
+								gameObject.screen.changeScreen( 'onEndingScreen' );
 
 							}
 
@@ -362,19 +413,58 @@ window.addEventListener( 'load', function startScript() {
 
 					break;
 
+				// Ending screen will show ending text and reset game
+
+				case gameObject.screen.onEndingScreen:
+
+					gameObject.interface.scrollText.move();
+					gameObject.interface.scrollText.update();
+
+					gameObject.graphics.clear();
+					gameObject.graphics.drawBackground();
+					gameObject.graphics.drawScrollText();
+
+					if ( gameObject.interface.scrollText.finished ) {
+
+						// Transitioning screen back to title
+
+						gameObject.graphics.drawTitle();
+						gameObject.screen.transitionScreen();
+
+						if ( gameObject.screen.transitionFinished ) {
+
+							// Reseting screen states
+
+							gameObject.screen.transitionScreen();
+
+							// Reseting game and scrollText properties
+
+							gameObject.state.resetGame();
+							gameObject.interface.scrollText.reset();
+
+							// Actually changing to title screen
+
+							gameObject.screen.changeScreen( 'onTitleScreen' );
+
+						}
+
+					}
+
+					break;
+
 				default:
 					gameObject.graphics.drawBackground();
 
 			}
 
-			gameObject.id = requestAnimationFrame( updater );
+			gameObject.id = requestAnimationFrame( gameManager.updateGame );
 
 		},
 
 		// Just in case we want to add a play/pause game command later
 
 		stopGame() {
-			cancelAnimationFrame( gameObject.id );
+			window.cancelAnimationFrame( gameObject.id );
 		}
 
 	}
@@ -422,17 +512,14 @@ window.addEventListener( 'load', function startScript() {
 			inTransition: false,
 			started: false,
 			finished: false,
+			running: true,		 // If the game is running or paused
+			wasPaused: false,  // A check needed to stop time animation on pause
 
 			// Levels states
 
 			level1: {
 				started: false,
-
-				/* Score needed to achieve to fight boss. For test purposes it's
-				 * 1 now, but default === 10000
-				 */
-
-				bossScore: 1,					
+				bossScore: 10000,					
 				bossStarted: false,
 				bossFinished: false,
 				inVictory: false,		// For victory track and level transition
@@ -441,7 +528,7 @@ window.addEventListener( 'load', function startScript() {
 
 			level2: {
 				started: false,
-				bossScore: 80000,
+				bossScore: 60000,
 				bossStarted: false,
 				bossFinished: false,
 				inVictory: false,
@@ -475,12 +562,18 @@ window.addEventListener( 'load', function startScript() {
 				gameObject.components.background.x = 0;
 				gameObject.components.background.y1 = 0;
 				gameObject.components.background.y2 = -canvasHeight;
+				gameObject.components.background.started = false;
 
 				// Player
 
 				gameObject.components.player.x = canvasWidth * .5 - 30;
 				gameObject.components.player.y = canvasHeight * 1.1;
 				gameObject.components.player.allowPlayer = false;
+				gameObject.components.player.movingUp = false;
+				gameObject.components.player.movingDown = false;
+				gameObject.components.player.movingRight = false;
+				gameObject.components.player.movingLeft = false;
+				gameObject.components.player.shooting = false;
 				gameObject.components.player.speed = 1 / 2;
 				gameObject.components.player.lives = 3;
 				gameObject.components.player.invincible = false;
@@ -496,14 +589,14 @@ window.addEventListener( 'load', function startScript() {
 				// Power ups
 
 				gameObject.components.powerUps.list = [];
-				gameObject.components.powerUps.spawnInterval = 50000;
+				gameObject.components.powerUps.spawnInterval = 35000;
 
 				// Enemies
 
 				gameObject.components.enemies.list = [];
 				gameObject.components.enemies.bosses = [];
 				gameObject.components.enemies.shots = [];
-				gameObject.components.enemies.spawnInterval = 14000;
+				gameObject.components.enemies.spawnInterval = 10000;
 
 				// States
 
@@ -525,6 +618,11 @@ window.addEventListener( 'load', function startScript() {
 
 				gameObject.state.victory.intervalReferenceTime = 0;
 
+				// Audio reset
+
+				gameObject.audio.currentStereo.pan.value = 0;
+				gameObject.audio.currentStereoValue = 0
+
 			}
 
 		},
@@ -540,7 +638,7 @@ window.addEventListener( 'load', function startScript() {
 			background: {
 
 				/* There will be Ys positions as we need two backgrounds
-				 * for scroll effect
+				 * for infinite scroll effect
 				 */
 
 				x: 0,
@@ -548,19 +646,22 @@ window.addEventListener( 'load', function startScript() {
 				y2: -canvasHeight,
 				width: canvasWidth,
 				height: canvasHeight,
+				started: false,
 
 				move() {
 
+					if ( !this.started ) {
+
+						// Reset in case of resize
+
+						this.started = true;
+						this.y1 = -canvasHeight;
+						this.y2 = -canvasHeight;
+
+					}
+
 					this.y1 += gameObject.time.deltaRate * ( 1 / 3 );
 					this.y2 += gameObject.time.deltaRate * ( 1 / 3 );
-
-					if ( this.y1 >= canvasHeight ) {
-						this.y1 = -canvasHeight;
-					}
-
-					if ( this.y2 >= canvasHeight ) {
-						this.y2 = -canvasHeight;
-					}
 					
 				}
 
@@ -777,7 +878,7 @@ window.addEventListener( 'load', function startScript() {
 								gameObject.screen.transitionFinished = false;
 								gameObject.screen.transitionAlphaColor = 0;
 
-								// Calling game over transitions adn resseting audio
+								// Calling game over transitions and reseting audio
 
 								gameObject.audio.transitionFinished = false;
 								gameObject.state.gameOver.inTransition = true;
@@ -805,7 +906,7 @@ window.addEventListener( 'load', function startScript() {
 				list: [],      //  List with enemies to perform actions and checks
 				bosses: [],    // Level bosses
 				shots: [],
-				spawnInterval: 14000,  		// This will vary slightly
+				spawnInterval: 10000,  		// This will vary slightly
 				spawnReferenceTime: 0,		// Reference to check if we can spawn
 
 				spawnEnemy() {
@@ -820,7 +921,7 @@ window.addEventListener( 'load', function startScript() {
 						type = Math.round( Math.random() + 1 ); // 1 - 2
 					}
 					else if ( gameObject.state.level2.started ) {
-						//type = Math.round( Math.random() + 3 ); // 3 - 4
+						type = Math.round( Math.random() + 3 ); // 3 - 4
 					}
 
 					// Enemy data (vary with type)
@@ -831,18 +932,26 @@ window.addEventListener( 'load', function startScript() {
 						deathAnimationMaxStep,
 						width,
 						height,
+						speedX,
+						speedY,
 						shotOffsetX,
 						shotOffsetY,
 						shotWidth,
 						shotHeight,
 						shotRadius,
 						shotEndurance,
-						shotSpeed;
+						shotSpeed,
+						shotInterval,
+						shotSequenceInterval,
+						shotSequenceMaxStep,
+						canShoot;
 
 					if ( type === 1 ) {
 
 						width = 70;
 						height = 70;
+						speedX = .6 + ( ( Math.random() * 2 ) / 2 );
+						speedY = ( .5 + Math.random() ) / 3;
 						hitPoints = 1;
 						scorePoints = 300;
 						shotWidth = null;    	 // Not a rectangular shot
@@ -852,14 +961,20 @@ window.addEventListener( 'load', function startScript() {
 						shotRadius = 10;
 						shotEndurance = 1;
 						shotSpeed = 2;
+						shotInterval = Math.round( Math.random() * 1500 + 2000 );
+						shotSequenceInterval = 0;
+						shotSequenceMaxStep = 1;
 						deathAnimationInterval = 100;
 						deathAnimationMaxStep = 12;
+						canShoot = true;
 
 					}
 					else if ( type === 2 ) {
 
 						width = 80;
 						height = 80;
+						speedX = .6 + ( ( Math.random() * 2 ) / 2 );
+						speedY = ( .5 + Math.random() ) / 3;
 						hitPoints = 2;
 						scorePoints = 400;
 						shotWidth = 4;    	 
@@ -869,19 +984,69 @@ window.addEventListener( 'load', function startScript() {
 						shotRadius = null;		// Not a circular shot
 						shotEndurance = 2;
 						shotSpeed = 2;
+						shotInterval = Math.round( Math.random() * 1500 + 2000 );
+						shotSequenceInterval = 0;
+						shotSequenceMaxStep = 1;
 						deathAnimationInterval = 150;
 						deathAnimationMaxStep = 10;
+						canShoot = true;
+
+					}
+					else if ( type === 3 ) {
+
+						width = 60;
+						height = 80;
+						speedX = 1.5 + Math.random();
+						speedY = 2 + Math.random();
+						hitPoints = 3;
+						scorePoints = 4000;
+						shotWidth = null;    	 
+						shotHeight = null;
+						shotOffsetX = width / 2;
+						shotOffsetY = height / 2;
+						shotRadius = 15;
+						shotEndurance = 2;
+						shotSpeed = 3;
+						shotInterval = null;
+						shotSequenceInterval = null;
+						shotSequenceMaxStep = null;
+						deathAnimationInterval = 100;
+						deathAnimationMaxStep = 10;
+						canShoot = false;
+
+					}
+					else if ( type === 4 ) {
+
+						width = 80;
+						height = 120;
+						speedX = 2.5 + Math.random();
+						speedY = 2 + Math.random();
+						hitPoints = 4;
+						scorePoints = 2500;
+						shotWidth = 3;    	 
+						shotHeight = 30;
+						shotOffsetX = ( width - shotWidth ) / 2;
+						shotOffsetY = height / 2;
+						shotRadius = null;
+						shotEndurance = 4;
+						shotSpeed = 3;
+						shotInterval = 1000;
+						shotSequenceInterval = 300;
+						shotSequenceMaxStep = 5;
+						deathAnimationInterval = 100;
+						deathAnimationMaxStep = 10;
+						canShoot = false;						
 
 					}
 
 					this.spawnInterval -= Math.floor( Math.random() * 300 + 300 );
 
-					if ( this.spawnInterval < 10000 ) {
-						this.spawnInterval = 10000;
+					if ( this.spawnInterval < 7000 ) {
+						this.spawnInterval = 7000;
 					}
 
-					/* We'll put random x and y's in variables because we need to
-					 * reference them in the collision circle
+					/* We'll put random xs and ys in variables because we need to
+					 * reference them in the collision circle object
 					 */
 
 					const x = Math.random() * canvasWidth * .9 + 50,
@@ -900,14 +1065,22 @@ window.addEventListener( 'load', function startScript() {
 						hitPoints: hitPoints,
 						scorePoints: scorePoints,
 						angle: Math.PI / 2,
-						speedX: .6 + ( ( Math.random() * 2 ) / 2 ),
-						speedY: ( .5 + Math.random() ) / 3,
+						speedX: speedX,
+						speedY: speedY,
 						angleSpeed: Math.PI / 90,
 
-						// Shot interval between  2000 - 3500
+						// Shot interval properties
 
-						shotInterval: Math.round( Math.random() * 1500 + 2000 ),
-						shotReferenceTime: 0,
+						shotInterval: shotInterval,
+						shotIntervalReferenceTime: 0,
+						shotSequenceInterval: shotSequenceInterval,
+						shotSequenceReferenceTime: 0,
+						shotSequenceStep: 0,
+						shotSequenceMaxStep: shotSequenceMaxStep,
+
+						// If enemy can shoot
+
+						canShoot: canShoot,
 
 						// Death animation properties
 
@@ -1009,8 +1182,65 @@ window.addEventListener( 'load', function startScript() {
 
 								}
 
-							  this.y += this.speedY;
+							  this.y += gameObject.time.deltaRate * this.speedY;
 							  this.collisionCircle.y = this.y + this.height / 2;
+
+							}
+							else if ( this.type === 3 ) {
+
+								/* This is a kamikaze enemy that will move towards
+ 								 * the player and then explode, generating 8 shots in
+ 								 * various angles. We could have done the following 
+ 								 * conditional with the type one, but this is better for
+ 								 * organization purposes
+ 								 */
+
+ 								// Player alias
+
+ 								const player = gameObject.components.player;
+
+								if ( this.x + this.width <= player.x ) {
+									this.speedX = Math.abs( this.speedX );
+								}
+								else if ( this.x >= player.x + player.width ) {
+									this.speedX = -Math.abs( this.speedX );
+								}
+
+								this.x += gameObject.time.deltaRate * this.speedX;
+								this.y += gameObject.time.deltaRate * this.speedY;
+								this.collisionCircle.x = this.x + this.width / 2;
+ 								this.collisionCircle.y = this.y + this.height / 2;
+
+							}
+							else if ( this.type === 4 ) {
+
+								if ( this.y < canvasHeight * .1 ) {
+
+									this.y += gameObject.time.deltaRate * this.speedY;
+									this.collisionCircle.y = this.y + this.height / 2;
+
+								}
+
+								if ( !this.canShoot && !this.dead ) {
+
+									if ( this.x < player.x ) {
+										this.speedX = Math.abs( this.speedX );
+									}
+									else {
+										this.speedX = -Math.abs( this.speedX );	
+									}
+
+									this.x += gameObject.time.deltaRate * this.speedX;
+									this.collisionCircle.x = this.x + this.width / 2;
+
+								}
+
+								if ( Math.abs( this.x - player.x + 
+														   ( this.width - player.width ) / 2 ) <=
+									   player.width / 4 )
+								{
+									this.canShoot = true;
+								}
 
 							}
 
@@ -1018,7 +1248,27 @@ window.addEventListener( 'load', function startScript() {
 
 						shoot() {
 
-							if ( !this.dead ) {
+							this.shotSequenceStep++;
+
+							if ( this.shotSequenceStep >= this.shotSequenceMaxStep ) {
+
+								// Sequence ended
+
+								this.shotSequenceStep = 0;
+
+								// Updating interval reference
+
+								this.shotIntervalReferenceTime = gameObject.time.currentTime;
+
+								if ( this.type === 4 ) {
+									this.canShoot = false;
+								}
+
+							}
+
+							// For types 1, 2 and 4
+
+							if ( this.type === 1 || this.type === 2 || this.type === 4 ) {
 
 								gameObject.components.enemies.shots.push( {
 
@@ -1041,12 +1291,41 @@ window.addEventListener( 'load', function startScript() {
 
 								} );
 
-								// Playing shot sound
-
-								gameObject.audio.playSound(
-									gameObject.media.gameSE[2], false, false, true
-								);
 							}
+							else if ( this.type === 3 ) {
+
+								for ( let i = 0; i < 8; i++ ) {
+
+									gameObject.components.enemies.shots.push( {
+
+										x: this.x + shotOffsetX,
+										y: this.y + shotOffsetY,
+										width: shotWidth,
+										height: shotHeight,
+										radius: shotRadius,
+										endurance: shotEndurance,
+										angle: this.angle + i * ( Math.PI / 4 ),
+										speed: shotSpeed,
+										type: this.type,
+
+										move() {
+											this.y += gameObject.time.deltaRate *
+													this.speed * Math.sin( this.angle );
+							  			this.x += gameObject.time.deltaRate *
+							  					this.speed * Math.cos( this.angle );
+										}
+
+									} );
+
+								}
+
+							}
+
+							// Playing shot sound
+
+							gameObject.audio.playSound(
+								gameObject.media.gameSE[2], false, false, true
+							);
 
 						}
 
@@ -1090,7 +1369,7 @@ window.addEventListener( 'load', function startScript() {
 									gameObject.state.level1.bossFinished = true;
 								}
 								else if ( gameObject.state.level2.started &&
-										 			!gameObject.state.level1.finished )
+										 			!gameObject.state.level2.finished )
 								{
 									gameObject.state.level2.bossFinished = true;
 								}
@@ -1106,27 +1385,42 @@ window.addEventListener( 'load', function startScript() {
 									false, true, false
 								);
 
+								// Reseting stereo
+
+								gameObject.audio.currentStereo.pan.value = 0;
+								gameObject.audio.currentStereoValue = 0;
+
 							}
 							else {
+
+								if ( enemy.type === 3 ) {
+									enemy.shoot();   // Will explode in shots
+								}
+
 								gameObject.components.enemies.list.splice( index, 1 );	
+
 							}
 
 							gameObject.components.player.score += enemy.scorePoints;
-							enemy.deathCanDraw = false;
+							enemy.deathAnimationCanDraw = false;
 							result = false;
 
-							if ( gameObject.components.player.score >=
+							if ( gameObject.components.player.lives > 0 ) {
+
+								if ( gameObject.components.player.score >=
 									 gameObject.state.level1.bossScore &&
 									 !gameObject.state.level1.bossStarted )
-							{
-								gameObject.components.callBoss( 1 );
-							}
-							else if ( gameObject.components.player.score >
-									 			gameObject.state.level2.bossScore &&
-									 			!gameObject.state.level2.bossStarted &&
-									 			gameObject.state.level2.started )
-							{
-								gameObject.components.callBoss( 2 );
+								{
+									gameObject.components.callBoss( 1 );
+								}
+								else if ( gameObject.components.player.score >
+										 			gameObject.state.level2.bossScore &&
+										 			!gameObject.state.level2.bossStarted &&
+										 			gameObject.state.level2.started )
+								{
+									gameObject.components.callBoss( 2 );
+								}
+
 							}
 
 						}
@@ -1146,15 +1440,15 @@ window.addEventListener( 'load', function startScript() {
 			powerUps: {
 
 				list: [],
-				spawnInterval: 50000,
+				spawnInterval: 35000,
 				spawnReferenceTime: 0,
 
 				spawnPowerUp() {
 
 					this.spawnInterval -= Math.random() * 600;
 
-					if ( this.spawnInterval < 20000 ) {
-						this.spawnInterval = 20000;
+					if ( this.spawnInterval < 10000 ) {
+						this.spawnInterval = 10000;
 					}
 
 					this.list.push( {
@@ -1170,7 +1464,7 @@ window.addEventListener( 'load', function startScript() {
 						 * shot 1 | shot 2 | shot 3 | lives +1 | speed +.25
 						 */
 
-						type: Math.round( Math.random() * 5 ),
+						type: Math.round( Math.random() * 4 + 1 ),
 
 						move() {
 							this.y += gameObject.time.deltaRate * this.speedY;
@@ -1205,11 +1499,21 @@ window.addEventListener( 'load', function startScript() {
 					shotEndurance,
 					shotSpeed,
 					shotInterval,
-					shotIntervalReferenceTime,
 					shotSequenceInterval,
-					shotSequenceReferenceTime,
-					shotSequenceStep,
-					shotSequenceMaxStep;
+					shotSequenceMaxStep,
+					canShoot,
+					canMove;
+
+				// This will generate a random initial direction to each boss
+
+				let randomDir;
+
+				if ( Math.random() > .5 ) {
+					randomDir = 1;
+				}
+				else {
+					randomDir = -1;
+				}
 
 				if ( level === 1 ) {
 
@@ -1224,17 +1528,19 @@ window.addEventListener( 'load', function startScript() {
 					bossType = 5;		
 					width = 100;
 					height = 100;	
-					hitPoints = 1;				// For tests, default === 100
+					hitPoints = 50;
 					scorePoints = 10000;
-					speedX = 4;
+					speedX = 4 * randomDir;
 					speedY = 0;
 					angle = 0;
 					angleSpeed = 0;
+					canMove = true;
 
 					// Shot related data
 
 					shotOffsetX = width / 2;
 					shotOffsetY = height / 2;
+					canShoot = true;
 
 					// Making shot width adequate for viewport
 
@@ -1250,19 +1556,56 @@ window.addEventListener( 'load', function startScript() {
 					shotEndurance = 10;
 					shotSpeed = 3;
 					shotInterval = 2000;
-					shotIntervalReferenceTime = 0;
 					shotSequenceInterval = 300;
-					shotSequenceReferenceTime = 0;
-					shotSequenceStep = 0;
 					shotSequenceMaxStep = 4;
 
 				}
 
-				// Creating first boss
+				// In case we want to add more levels in the future
+
+				else if ( level === 2 ) {
+
+					gameObject.state.level2.bossStarted = true;
+					bossType = 6;		
+					width = 140;
+					height = 180;	
+					hitPoints = 100;
+					scorePoints = 50000;
+
+					if ( window.innerWidth >= 576 ) {
+						speedX = 6;
+					}
+					else {
+						speedX = 3;
+					}
+
+					speedX *= randomDir;
+					speedY = 0;
+					angle = 0;
+					angleSpeed = 0;
+					canMove = false;
+
+					// Shot related data
+
+					shotOffsetX = width / 2;
+					shotOffsetY = height / 2;
+					canShoot = true;
+					shotRadius = 20;
+					shotWidth = null;
+					shotHeight = null;
+					shotEndurance = Number.POSITIVE_INFINITY;
+					shotSpeed = 3.5;
+					shotInterval = 0;   // Will be based on movement instead of time
+					shotSequenceInterval = 250;
+					shotSequenceMaxStep = 6;
+
+				}
+
+				// Creating boss
 
 				gameObject.components.enemies.bosses.push( {
 
-					x: canvasWidth * .5 - 50,
+					x: canvasWidth * .5 - width / 2,
 					y: -200,
 					width: width,
 					height: height,
@@ -1274,19 +1617,21 @@ window.addEventListener( 'load', function startScript() {
 					angleSpeed: angleSpeed,
 					speedX: speedX,
 					speedY: speedY,
+					canMove: canMove,
 
 					// Shot properties, such as interval, sequenceInterval, times, etc.
 
+					canShoot: canShoot,
 					shotInterval: shotInterval,
-					shotIntervalReferenceTime: shotIntervalReferenceTime,
+					shotIntervalReferenceTime: 0,
 					shotSequenceInterval: shotSequenceInterval,
-					shotSequenceReferenceTime: shotSequenceReferenceTime,
+					shotSequenceReferenceTime: 0,
 
-					/* Number of shots to shoot in sequence, the step in
-					 * shooting them and if next shot is a sequence
+					/* Number of shots to shoot in sequence and the step in
+					 * shooting them
 					 */
 
-					shotSequenceStep: shotSequenceStep,
+					shotSequenceStep: 0,
 					shotSequenceMaxStep: shotSequenceMaxStep,
 
 					// Death animation properties
@@ -1303,7 +1648,7 @@ window.addEventListener( 'load', function startScript() {
 
 					collisionCircle: {
 						x: canvasWidth * .5,
-						y: -200,
+						y: -200 + height / 2,
 						radius: width / 2
 					},
 
@@ -1322,27 +1667,61 @@ window.addEventListener( 'load', function startScript() {
 							}
 
 						}
-						else if ( !this.dead ) {
+
+						/* moveAll doesn't check canMove, as it's specific for bosses,
+						 * so we gotta do it here
+						 */
+
+						else if ( !this.dead && this.canMove ) {
+
+							let boundaryX;		// The boundary to toggle speedX
 
 							if ( this.type === 5 ) {
+								boundaryX = 0;
+							}
+							else if ( this.type === 6 ) {
 
-								if ( this.x <= 0 ) {
+								boundaryX = canvasWidth * .1
 
-									this.x = 0;
-									this.speedX = Math.abs( this.speedX );
+								// Boss level 2 move'n'shoot behavior check
+
+								if ( this.x <= boundaryX ||
+									   this.x + this.width >= canvasWidth - boundaryX ||
+									   Math.abs( ( canvasWidth - this.width ) / 2 - this.x ) <
+									   Math.abs( this.speedX / 2 ) ) {
+
+									this.canMove = false;
+									this.canShoot = true;
 
 								}
-								else if ( this.x + this.width >= canvasWidth ) {
-
-									this.x = canvasWidth - this.width;
-									this.speedX = -Math.abs( this.speedX );
-
-								}
-
-								this.x += gameObject.time.deltaRate * this.speedX;
-								this.collisionCircle.x = this.x + this.width / 2;
 
 							}
+
+							// Moving
+
+							if ( this.x <= boundaryX ) {
+
+								this.x = boundaryX;
+								this.speedX = Math.abs( this.speedX );
+
+							}
+							else if ( this.x + this.width >= canvasWidth - boundaryX ) {
+
+								this.x = canvasWidth - this.width - boundaryX;
+								this.speedX = -Math.abs( this.speedX );
+
+							}
+
+							this.x += gameObject.time.deltaRate * this.speedX;
+							this.collisionCircle.x = this.x + this.width / 2;
+
+							// Toggling stereo sound based on boss position
+
+							const stereoValue = ( 2 * ( this.x + ( this.width / 2 ) ) ) /
+																	canvasWidth - 1;
+
+							gameObject.audio.currentStereo.pan.value = stereoValue;
+							gameObject.audio.currentStereoValue = stereoValue;
 
 						}
 
@@ -1350,62 +1729,67 @@ window.addEventListener( 'load', function startScript() {
 
 					shoot() {
 
-						if ( !this.dead ) {
 
-							/* There will be two intervals checked by checkAll. One will
-							 * be the interval between shot actions and another 
-							 * between shots sequences (shotInterval and
-							 * shotSequenceInterval, respectively). This method will only
-							 * handle steps and the shotInSequence boolean
-							 */
+						/* There will be two intervals checked by checkAll. One will
+						 * be the interval between shoot actions and another 
+						 * between shots sequences (shotInterval and
+						 * shotSequenceInterval, respectively). This method will only
+						 * handle steps in the sequence, not the checks
+						 */
 
-							this.shotSequenceStep++;
+						this.shotSequenceStep++;
 
-							if ( this.shotSequenceStep >= this.shotSequenceMaxStep ) {
+						if ( this.shotSequenceStep >= this.shotSequenceMaxStep ) {
 
-								// Sequence ended
+							// Sequence ended
 
-								this.shotSequenceStep = 0;
-								this.shotInSequence = false;
+							this.shotSequenceStep = 0;
 
-								// Updating interval reference
+							// Updating interval reference
 
-								this.shotIntervalReferenceTime = gameObject.time.currentTime;
+							this.shotIntervalReferenceTime = gameObject.time.currentTime;
 
+							// For level 2 boss
+
+							if ( this.type === 6 ) {
+								this.canShoot = false;
+								this.canMove = true;
 							}
 
-							// The shot itself
+						}
 
-							if ( this.type === 5 ) {
+						// The shot itself
 
-								gameObject.components.enemies.shots.push( {
+						if ( this.type === 5 || this.type === 6 ) {
 
-									x: this.x + shotOffsetX,
-									y: this.y + shotOffsetY,
-									width: shotWidth,
-									height: shotHeight,
-									radius: shotRadius,
-									endurance: shotEndurance,
+							gameObject.components.enemies.shots.push( {
 
-									/* Angle is relative to canvas. As the boss angle is 0,
-									 * because the image is already adjusted by default, we
-									 * need to add Math.PI / 2 to make the shot go down
-									 */
+								x: this.x + shotOffsetX,
+								y: this.y + shotOffsetY,
+								width: shotWidth,
+								height: shotHeight,
+								radius: shotRadius,
+								endurance: shotEndurance,
 
-									angle: this.angle + Math.PI / 2,
-									speed: shotSpeed,
-									type: this.type,
+								/* Angle is relative to canvas. As the boss angle is 0,
+								 * because the image is already adjusted by default, we
+								 * need to add Math.PI / 2 to make the shot go down
+								 */
 
-									move() {
-										this.y += gameObject.time.deltaRate *
-												this.speed * Math.sin( this.angle );
-						  			this.x += gameObject.time.deltaRate *
-						  					this.speed * Math.cos( this.angle );
-									}
+								angle: this.angle + Math.PI / 2,
+								speed: shotSpeed,
+								type: this.type,
 
-								} );
+								move() {
 
-							}
+									this.y += gameObject.time.deltaRate *
+											this.speed * Math.sin( this.angle );
+					  			this.x += gameObject.time.deltaRate *
+					  					this.speed * Math.cos( this.angle );
+
+								}
+
+							} );
 
 							// Playing shot sound
 
@@ -1505,7 +1889,7 @@ window.addEventListener( 'load', function startScript() {
 
 				this.powerUps.list.forEach( function checkActivity(powerUp, index) {
 
-					if ( powerUp.active ) {
+					if ( powerUp.active && gameObject.components.player.lives > 0 ) {
 
 						switch ( powerUp.type ) {
 
@@ -1544,9 +1928,8 @@ window.addEventListener( 'load', function startScript() {
 					   this.enemies.spawnInterval &&
 					   gameObject.components.player.allowPlayer &&
 					   !( gameObject.state.level1.bossStarted &&
-					   		!gameObject.state.level1.finished ) &&
-					   !( gameObject.state.level2.bossStarted &&
-					   		!gameObject.state.level2.finished ) )
+					   		!gameObject.state.level2.started ) &&
+					   !gameObject.state.level2.bossStarted )
 				{
 					this.enemies.spawnReferenceTime =	gameObject.time.currentTime;
 					this.enemies.spawnEnemy();
@@ -1569,13 +1952,21 @@ window.addEventListener( 'load', function startScript() {
 							gameObject.components.enemies.deathAnimate( enemy, index );
 						}
 
-						if (
-								gameObject.time.currentTime - enemy.shotReferenceTime >
-						  	enemy.shotInterval
-						  )
+						// Shoot action
+
+						if ( gameObject.time.currentTime -
+								 enemy.shotIntervalReferenceTime >
+						  	 enemy.shotInterval && !enemy.dead && enemy.canShoot )
 						{
-							enemy.shotReferenceTime = gameObject.time.currentTime;
-							enemy.shoot();
+
+							if ( gameObject.time.currentTime -
+									 enemy.shotSequenceReferenceTime >=
+									 enemy.shotSequenceInterval )
+							{
+								enemy.shotSequenceReferenceTime =	gameObject.time.currentTime;
+								enemy.shoot();
+							}
+
 						}
 
 					}
@@ -1597,7 +1988,8 @@ window.addEventListener( 'load', function startScript() {
 								
 								if ( gameObject.time.currentTime -
 										 boss.shotSequenceReferenceTime >=
-									 	 boss.shotSequenceInterval )
+									 	 boss.shotSequenceInterval &&
+									 	 !boss.dead && boss.canShoot )
 								{
 									boss.shotSequenceReferenceTime =
 									gameObject.time.currentTime;
@@ -1639,6 +2031,65 @@ window.addEventListener( 'load', function startScript() {
 					} );
 
 				} );
+
+				/* Checking for special shot explosion when fighting boss 2.
+				 * This won't be added to small screens or else will make the game
+				 * extremely difficult and non-suitable for small viewports
+				 */
+
+				if ( gameObject.state.level2.bossStarted &&
+				     !gameObject.state.level2.bossFinished &&
+				     canvasWidth >= 576 ){
+
+					gameObject.components.enemies.shots.forEach(
+						function checkTypeSix(shot, index) {
+
+							if ( shot.type === 6 && shot.y >= canvasHeight / 2 &&
+
+									/* Current boss is the only one, when they die they're
+		  					   * removed. However an array allow numerous
+		  					   * possibilities, that's why we use them ( e.g we could 
+		  					   * create a level with with two bosses )
+		  					   */
+
+							     gameObject.components.enemies.bosses[0].hitPoints < 50 )
+							{
+
+								gameObject.components.enemies.shots.splice( index, 1 );
+
+								// Creating explosion shots
+
+								for ( let i = 0; i < 8; i++ ) {
+
+			  					gameObject.components.enemies.shots.push( {
+
+										x: shot.x,
+										y: shot.y,
+										width: null,
+										height: null,
+										radius: shot.radius / 2,
+										endurance: 5,
+										angle: shot.angle + i * ( Math.PI / 4 ),
+										speed: shot.speed * 2,
+										type: 7,
+
+										move() {
+											this.y += gameObject.time.deltaRate *
+													this.speed * Math.sin( this.angle );
+							  			this.x += gameObject.time.deltaRate *
+							  					this.speed * Math.cos( this.angle );
+										}
+
+			  					} );
+
+			  				}
+
+							}
+
+						}
+					);
+
+				}
 
 				// Checking collisions
 
@@ -1711,7 +2162,9 @@ window.addEventListener( 'load', function startScript() {
 
 						// Circular shot
 
-						if ( ( enemyShot.type === 1 || enemyShot.type === 5 ) &&
+						if ( ( enemyShot.type === 1 || enemyShot.type === 5 ||
+						       enemyShot.type === 3 || enemyShot.type === 6 ||
+						       enemyShot.type === 7 ) &&
 							   gameObject.components.checkCollisionTwoCircles(
 							     gameObject.components.player.collisionCircle,
 							     enemyShot
@@ -1722,7 +2175,7 @@ window.addEventListener( 'load', function startScript() {
 							enemyShot.endurance--;
 						}
 						else if (
-								enemyShot.type === 2 &&
+								( enemyShot.type === 2 || enemyShot.type === 4 ) &&
 								gameObject.components.checkCollisionCircleRect(
 									gameObject.components.player.collisionCircle,
 									enemyShot
@@ -1737,20 +2190,20 @@ window.addEventListener( 'load', function startScript() {
 
 							function checkShotsCollision(playerShot) {
 
-								if ( ( enemyShot.type === 1 || enemyShot.type === 5 ) &&
-							   		 gameObject.components.checkCollisionTwoCircles(
-							     	   playerShot, enemyShot
-							   		 )
-								)
+								if ( ( enemyShot.type === 1 || enemyShot.type === 3 ||
+											 enemyShot.type === 5 || enemyShot.type === 6 ||
+											 enemyShot.type === 7 ) &&
+								   		 gameObject.components.checkCollisionTwoCircles(
+								     	   playerShot, enemyShot
+								   		 ) )
 								{
 									playerShot.endurance--;
 									enemyShot.endurance--;
 								}
-								else if ( enemyShot.type === 2 &&
-							   		 gameObject.components.checkCollisionCircleRect(
-							     	   playerShot, enemyShot
-							   		 )
-								)
+								else if (	( enemyShot.type === 2 || enemyShot.type === 4 ) &&
+									   		 		gameObject.components.checkCollisionCircleRect(
+									     	    	playerShot, enemyShot
+									   		 		)	)
 								{
 									playerShot.endurance--;
 									enemyShot.endurance--;
@@ -2011,6 +2464,7 @@ window.addEventListener( 'load', function startScript() {
 			onHowToScreen: false,
 			onCreditScreen: false,
 			onGameOverScreen: false,
+			onEndingScreen: false,
 
 			// Transitions properties for screen fade effect
 
@@ -2081,7 +2535,7 @@ window.addEventListener( 'load', function startScript() {
 
 		},
 
-		// Loader object to handle loading
+		// Loader object to handle media loading ( images, sounds, tracks, etc. )
 
 		loader: {
 			loading: false,		// If was asked to load initial resources
@@ -2279,31 +2733,39 @@ window.addEventListener( 'load', function startScript() {
 			}
 		},
 
-		/* UPDATE: it's better to leave this section for interface only,
-		 * as components don't suit their functionality
-		 */
+		// Interface components, such as loading screen, options, etc.
 
 		interface: {
 
-			// Intro object to show game story
+			// ScrollText object to hold intro and ending...scrolling texts -.-
 
-			intro: {
+			scrollText: {
 
 				x: canvasWidth * .1,
-				y: canvasHeight,
+				y: canvasHeight + 22,
 				textSize: 22,
 				speedY: - 1 / 3,
 				width: canvasWidth * .8,
 				height: 22,								// Will be updated with method, see later
-				text: [
-					'In a long distant galaxy, a lonely warrior was born to be a hero. ' +
-					'He trained hard every day to protect his people and became one of ' +
-					'the greatest warriors of the galaxy. Everything was peaceful. ' +
-					'However, a mad scientist named Jorhan made secret experiments with ' +
-					'the army, transforming them into crazy pilots that went shooting ' +
-					'everything they saw. Chaos, destruction and madness are ruining ' +
-					'the galaxy. Now it\'s up to you, space shooter, to save the ' +
-					'universe. Good luck !!'
+				introText: [
+					'In a long distant galaxy, a lonely warrior was born to ' +
+					'be a hero. He trained hard every day to protect his people and ' +
+					'became one of the greatest warriors of the galaxy. Everything ' +
+					'was peaceful. However, a mad scientist named Jorhan made secret ' +
+					'experiments with the army, transforming them into crazy pilots ' +
+					'that went shooting everything they saw. Chaos, destruction and ' +
+					'madness are ruining the galaxy. Now it\'s up to you, ' +
+					'space shooter, to save the universe. Good luck !!'
+				],
+				endingText: [
+					'When Jorhan saw that his greatest minion, Bouncing Skull, had ' +
+					'been defeated by our hero, he made a desperate attempt to become ' +
+					'more powerful. He made experiments with himself, that ' +
+					'eventually turned him in a demonic creature. After losing his ' +
+					'mind, he initiated a showdown with the space shooter. A long ' +
+					'battle had taken place, and after a lot of effort, Jorhan was ' +
+					'defeated and the universe saw peace again. There\'s only one ' +
+					'thing the galaxies want to say: thank you space shooter !!!'
 				],
 				finished: false,
 
@@ -2321,19 +2783,20 @@ window.addEventListener( 'load', function startScript() {
 
 				},
 
-				// Update for resizes, new lines set on rearrange, etc
-
-				update() {
-					this.x = canvasWidth * .1;
-					// Text here means array with text lines, not text itself -.-
-					this.height = this.textSize * this.text.length;
-				},
-
 				arrangeText() {
 					
 					/* Arranging text in canvas responsively is pain, but the idea here
 					 * is to split text recursively until it fits onscreen
 					 */
+
+					let baseText;
+
+					if ( gameObject.screen.onIntroScreen ) {
+						baseText = this.introText;
+					}
+					else if ( gameObject.screen.onEndingScreen ) {
+						baseText = this.endingText;
+					}
 
 					// This array will hold all lines of text
 
@@ -2343,10 +2806,9 @@ window.addEventListener( 'load', function startScript() {
 						 * lines to a single text, then retrieve each word of it
 						 */
 						
-						this.text.join( ' ' ).split( ' ' )
+						baseText.join( ' ' ).split( ' ' )
 
 					];
-
 
 					// Function to arrange lines
 
@@ -2387,7 +2849,36 @@ window.addEventListener( 'load', function startScript() {
 						arrayOfLines[ index ] = line.join( ' ' );
 					} );
 
-					this.text = Array.from( arrayOfLines );
+					if ( gameObject.screen.onIntroScreen ) {
+						this.introText = Array.from( arrayOfLines );
+					}
+					else if ( gameObject.screen.onEndingScreen ) {
+						this.endingText = Array.from( arrayOfLines );
+					}
+
+				},
+
+				// Update for resizes, new lines set on rearrange, etc
+
+				update() {
+					
+					if ( gameObject.screen.onIntroScreen ) {
+						this.height = this.textSize * this.introText.length;
+					}
+					else if ( gameObject.screen.onEndingScreen ) {
+						this.height = this.textSize * this.endingText.length;
+					}
+
+					this.x = canvasWidth * .1;
+					
+				},
+
+				// Reset when scroll has finished
+
+				reset() {
+
+					this.y = canvasHeight + 22;
+					this.finished = false;
 
 				}
 
@@ -2925,31 +3416,42 @@ window.addEventListener( 'load', function startScript() {
 
 			},
 
-			// Drawing sliding intro text
+			// Drawing sliding scroll intro and ending texts
 
-			drawIntro() {
+			drawScrollText() {
 
 				ctx.save();
 
 				ctx.font =
-				`${ gameObject.interface.intro.textSize }px Sedgwick Ave Display`;
+				`${ gameObject.interface.scrollText.textSize }px Sedgwick Ave Display`;
 				ctx.fillStyle = '#fff';
-				
 
-				// This will rearrange the text on screen if any of them overflow
+				/* This will rearrange the text on screen if any of them overflow.
+				 * It must be called here because it's here that the font is set,
+				 * else it won't get the right adjustment on screen
+				 */
 
-				gameObject.interface.intro.arrangeText();
+				gameObject.interface.scrollText.arrangeText();
 
-				gameObject.interface.intro.text.forEach(
-					function fillText(txt, index) {
-						ctx.fillText(
-							txt,
-							gameObject.interface.intro.x,
-							gameObject.interface.intro.y +
-							gameObject.interface.intro.textSize * index
-						);
-					}
-				);
+				let currentText;	// To differentiate between intro and ending texts
+
+				if ( gameObject.screen.onIntroScreen ) {
+					currentText =	gameObject.interface.scrollText.introText;
+				}
+				else if ( gameObject.screen.onEndingScreen ) {
+					currentText = gameObject.interface.scrollText.endingText;
+				}
+
+				currentText.forEach( function fillText(txt, index) {
+
+					ctx.fillText(
+						txt,
+						gameObject.interface.scrollText.x,
+						gameObject.interface.scrollText.y +
+						gameObject.interface.scrollText.textSize * index
+					);
+
+				} );
 
 				ctx.restore();
 
@@ -3387,8 +3889,17 @@ window.addEventListener( 'load', function startScript() {
 										case 2:
 											img.src = gameObject.media.gameImages[3];
 											break;
+										case 3:
+											img.src = gameObject.media.gameImages[7];
+											break;
+										case 4:
+											img.src = gameObject.media.gameImages[8];
+											break;
 										case 5:
 											img.src = gameObject.media.gameImages[1];
+											break;
+										case 6:
+											img.src = gameObject.media.gameImages[6];
 											break;
 										default:
 											console.log( 'Unknown enemy image type' );
@@ -3411,6 +3922,9 @@ window.addEventListener( 'load', function startScript() {
 									     enemy.type === 3 )
 									{
 										ctx.rotate( enemy.angle + Math.PI / 2 );	
+									}
+									else if ( enemy.type === 4 ) {
+										ctx.rotate( enemy.angle - Math.PI / 2 );	
 									}
 									else {
 										ctx.rotate( enemy.angle );
@@ -3486,13 +4000,20 @@ window.addEventListener( 'load', function startScript() {
 						switch ( shot.type ) {
 
 							case 1:
+							case 3:
 							case 5:
+							case 6:
+							case 7:
 
 								let gradientRadius,
 									shotGrad;
 
 								if ( shot.type === 1 ) {
 									gradientRadius = 3;
+								}
+								else if ( shot.type === 3 || shot.type === 6 ||
+													shot.type == 7 ) {
+									gradientRadius = ( shot.radius * 3 ) / 4;
 								}
 								else if ( shot.type === 5 ) {
 									gradientRadius = shot.radius / 2;
@@ -3504,17 +4025,26 @@ window.addEventListener( 'load', function startScript() {
 								);
 
 								if ( shot.type === 1 ) {
+									shotGrad.addColorStop( 0, '#040' );
+									shotGrad.addColorStop( .5, '#070' );
+									shotGrad.addColorStop( 1, '#0b0' );
+								}
+								else if ( shot.type === 3 ) {
 									shotGrad.addColorStop( 0, '#fff' );
-									shotGrad.addColorStop( .5, '#0a0' );
-									shotGrad.addColorStop( 1, '#0c0' );
+									shotGrad.addColorStop( .5, '#fcb' );
+									shotGrad.addColorStop( 1, '#caa' );
 								}
 								else if ( shot.type === 5 ) {
 									shotGrad.addColorStop( 0, '#ff0' );
 									shotGrad.addColorStop( .5, '#ca0' );
 									shotGrad.addColorStop( 1, '#a00' );
 								}
-
-								
+								else if ( shot.type === 6 || shot.type === 7 ) {
+									shotGrad.addColorStop( 0, '#fff' );
+									shotGrad.addColorStop( .3, '#bcf' );
+									shotGrad.addColorStop( .7, '#9ac' );
+									shotGrad.addColorStop( 1, '#79a' );
+								}
 
 								ctx.beginPath();
 								ctx.fillStyle = shotGrad;
@@ -3524,16 +4054,38 @@ window.addEventListener( 'load', function startScript() {
 								break;
 
 							case 2:
+							case 4:
 
-								ctx.fillStyle = '#33f';
+								// For colors and gradients
 
+								let shotFill;
+								
 								ctx.save();
 								ctx.translate(
 									shot.x + shot.width / 2,
 									shot.y + shot.height / 2
 								);
 								ctx.rotate( shot.angle + Math.PI / 2 );
-								ctx.fillRect( 0, 0, shot.width, shot.height );
+
+								if ( shot.type === 2 ) {
+									shotFill = '#33f';
+								}
+								else {
+									shotFill = ctx.createLinearGradient(
+										-shot.width, 0, shot.width / 2, 0
+									);
+									shotFill.addColorStop( 0, 'red' );
+									shotFill.addColorStop( 1, 'blue' );
+								}
+
+								ctx.fillStyle = shotFill;
+
+								ctx.fillRect(
+									-shot.width / 2,
+									-shot.height / 2,
+									shot.width,
+									shot.height
+								);
 								ctx.restore();
 
 								break;
@@ -3752,6 +4304,8 @@ window.addEventListener( 'load', function startScript() {
 			case gameObject.screen.onIntroScreen:
 
 				// Skipping intro
+
+				gameObject.interface.scrollText.reset();
 				gameObject.screen.changeScreen( 'onTitleScreen' );
 				break;
 
@@ -3779,12 +4333,28 @@ window.addEventListener( 'load', function startScript() {
 
 	} );
 
-	// To skip intro through keyboard
+	// To skip intro through keyboard and pause/resume game
 
-	window.addEventListener( 'keypress', function skipIntro() {
+	window.addEventListener( 'keypress', function skipAndPause(e) {
 
-		if ( gameObject.screen.onIntroScreen ) {
+		if ( gameObject.screen.onIntroScreen &&
+			   !( e.key === 'p' || e.key === 'P' ) ) {
+			gameObject.interface.scrollText.reset();
 			gameObject.screen.changeScreen( 'onTitleScreen' );
+		}
+		else if ( e.key === 'p' || e.key === 'P' ) {
+
+
+			if ( gameObject.state.running ) {
+				gameObject.state.running = false;
+				gameObject.state.wasPaused = true;
+				gameManager.stopGame();
+			}
+			else {
+				gameObject.state.running = true;
+				gameManager.startGame();
+			}
+
 		}
 
 	} );
