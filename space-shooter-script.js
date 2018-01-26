@@ -39,10 +39,7 @@ window.addEventListener( 'load', function startScript() {
 
 	// Finally appending it to the page
 
-	document.querySelector( 'body' ).insertBefore(
-		// Yeah, I'm lazy
-		canvas, document.querySelector( 'script' )
-	);
+	document.querySelector( 'body' ).appendChild( canvas );
 
 
 	// *** Game development section (oh god)
