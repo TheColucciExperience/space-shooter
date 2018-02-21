@@ -574,7 +574,7 @@ window.addEventListener( 'load', function startScript() {
 				gameObject.components.player.movingRight = false;
 				gameObject.components.player.movingLeft = false;
 				gameObject.components.player.shooting = false;
-				gameObject.components.player.speed = 1 / 2;
+				gameObject.components.player.speed = 1;
 				gameObject.components.player.lives = 3;
 				gameObject.components.player.invincible = false;
 				gameObject.components.player.hitPoints = 1;
@@ -589,14 +589,14 @@ window.addEventListener( 'load', function startScript() {
 				// Power ups
 
 				gameObject.components.powerUps.list = [];
-				gameObject.components.powerUps.spawnInterval = 35000;
+				gameObject.components.powerUps.spawnInterval = 30000;
 
 				// Enemies
 
 				gameObject.components.enemies.list = [];
 				gameObject.components.enemies.bosses = [];
 				gameObject.components.enemies.shots = [];
-				gameObject.components.enemies.spawnInterval = 10000;
+				gameObject.components.enemies.spawnInterval = 6000;
 
 				// States
 
@@ -660,8 +660,8 @@ window.addEventListener( 'load', function startScript() {
 
 					}
 
-					this.y1 += gameObject.time.deltaRate * ( 1 / 3 );
-					this.y2 += gameObject.time.deltaRate * ( 1 / 3 );
+					this.y1 += gameObject.time.deltaRate * ( 2 / 3 );
+					this.y2 += gameObject.time.deltaRate * ( 2 / 3 );
 
 					if ( this.y1 >= canvasHeight ) {
 						this.y1 = -canvasHeight;
@@ -685,7 +685,7 @@ window.addEventListener( 'load', function startScript() {
 				y: canvasHeight * 1.1,        // Initial Y
 				width: 60,
 				height: 60,
-				speed: 1 / 2,
+				speed: 1,
 				allowPlayer: false,           // Useful for simple animations
 				lives: 3,
 				hitPoints: 1,
@@ -782,7 +782,7 @@ window.addEventListener( 'load', function startScript() {
 
 						radius = 10;
 						endurance = 1;
-						speed = 2;
+						speed = 2.5;
 
 						if ( this.shotType === 1 ) {
 							angles.push( -Math.PI / 2 );
@@ -797,7 +797,7 @@ window.addEventListener( 'load', function startScript() {
 					else {
 						radius = 20;
 						endurance = 4;
-						speed = 1;
+						speed = 1.5;
 						angles.push( -Math.PI / 2 );
 					}
 
@@ -916,7 +916,7 @@ window.addEventListener( 'load', function startScript() {
 				list: [],      //  List with enemies to perform actions and checks
 				bosses: [],    // Level bosses
 				shots: [],
-				spawnInterval: 10000,  		// This will vary slightly
+				spawnInterval: 6000,  		// This will vary slightly
 				spawnReferenceTime: 0,		// Reference to check if we can spawn
 
 				spawnEnemy() {
@@ -960,8 +960,8 @@ window.addEventListener( 'load', function startScript() {
 
 						width = 70;
 						height = 70;
-						speedX = .6 + ( ( Math.random() * 2 ) / 2 );
-						speedY = ( .5 + Math.random() ) / 3;
+						speedX = 1 + ( ( Math.random() * 2 ) / 2 );
+						speedY = ( .8 + Math.random() ) / 3;
 						hitPoints = 1;
 						scorePoints = 300;
 						shotWidth = null;    	 // Not a rectangular shot
@@ -970,7 +970,7 @@ window.addEventListener( 'load', function startScript() {
 						shotOffsetY = height / 2;
 						shotRadius = 10;
 						shotEndurance = 1;
-						shotSpeed = 2;
+						shotSpeed = 3;
 						shotInterval = Math.round( Math.random() * 1500 + 2000 );
 						shotSequenceInterval = 0;
 						shotSequenceMaxStep = 1;
@@ -983,8 +983,8 @@ window.addEventListener( 'load', function startScript() {
 
 						width = 80;
 						height = 80;
-						speedX = .6 + ( ( Math.random() * 2 ) / 2 );
-						speedY = ( .5 + Math.random() ) / 3;
+						speedX = 1 + ( ( Math.random() * 2 ) / 2 );
+						speedY = ( .8 + Math.random() ) / 3;
 						hitPoints = 2;
 						scorePoints = 400;
 						shotWidth = 4;    	 
@@ -993,7 +993,7 @@ window.addEventListener( 'load', function startScript() {
 						shotOffsetY = height / 2;
 						shotRadius = null;		// Not a circular shot
 						shotEndurance = 2;
-						shotSpeed = 2;
+						shotSpeed = 3;
 						shotInterval = Math.round( Math.random() * 1500 + 2000 );
 						shotSequenceInterval = 0;
 						shotSequenceMaxStep = 1;
@@ -1007,7 +1007,7 @@ window.addEventListener( 'load', function startScript() {
 						width = 60;
 						height = 80;
 						speedX = 1.5 + Math.random();
-						speedY = 2 + Math.random();
+						speedY = 2.2 + Math.random();
 						hitPoints = 3;
 						scorePoints = 4000;
 						shotWidth = null;    	 
@@ -1016,7 +1016,7 @@ window.addEventListener( 'load', function startScript() {
 						shotOffsetY = height / 2;
 						shotRadius = 15;
 						shotEndurance = 2;
-						shotSpeed = 3;
+						shotSpeed = 4;
 						shotInterval = null;
 						shotSequenceInterval = null;
 						shotSequenceMaxStep = null;
@@ -1029,9 +1029,9 @@ window.addEventListener( 'load', function startScript() {
 
 						width = 80;
 						height = 120;
-						speedX = 2.5 + Math.random();
-						speedY = 2 + Math.random();
-						hitPoints = 4;
+						speedX = 2.8 + Math.random();
+						speedY = 2.2 + Math.random();
+						hitPoints = 5;
 						scorePoints = 2500;
 						shotWidth = 3;    	 
 						shotHeight = 30;
@@ -1039,7 +1039,7 @@ window.addEventListener( 'load', function startScript() {
 						shotOffsetY = height / 2;
 						shotRadius = null;
 						shotEndurance = 4;
-						shotSpeed = 3;
+						shotSpeed = 4;
 						shotInterval = 1000;
 						shotSequenceInterval = 300;
 						shotSequenceMaxStep = 5;
@@ -1051,8 +1051,8 @@ window.addEventListener( 'load', function startScript() {
 
 					this.spawnInterval -= Math.floor( Math.random() * 300 + 300 );
 
-					if ( this.spawnInterval < 7000 ) {
-						this.spawnInterval = 7000;
+					if ( this.spawnInterval < 3500 ) {
+						this.spawnInterval = 3500;
 					}
 
 					/* We'll put random xs and ys in variables because we need to
@@ -1343,7 +1343,7 @@ window.addEventListener( 'load', function startScript() {
 
 				},
 
-				deathAnimate(enemy, index) {
+				deathAnimate(enemy) {
 
 					let result = true;  // To determine if we make a recursion call
 
@@ -1371,7 +1371,14 @@ window.addEventListener( 'load', function startScript() {
 
 							if ( enemy.isBoss ) {
 
-								gameObject.components.enemies.bosses.splice( index, 1 );
+								/* Removing boss from array, we can do this as there is only
+								 * one at a time. We use an array, however, in case we want
+								 * to make two or more bosses at the same level. In that
+								 * case, we'd have to change the code a little bit, but the
+								 * structure is already in there
+								 */
+
+								gameObject.components.enemies.bosses.splice( 0, 1 );
 
 								if ( gameObject.state.level1.started &&
 										 !gameObject.state.level1.finished )
@@ -1407,7 +1414,15 @@ window.addEventListener( 'load', function startScript() {
 									enemy.shoot();   // Will explode in shots
 								}
 
-								gameObject.components.enemies.list.splice( index, 1 );	
+								gameObject.components.enemies.list.forEach(
+									function removeEnemy(currentEnemy, index) {
+
+										if ( enemy == currentEnemy ) {
+											gameObject.components.enemies.list.splice( index, 1 );
+										}										
+
+									}
+								);	
 
 							}
 
@@ -1439,7 +1454,7 @@ window.addEventListener( 'load', function startScript() {
 
 					if ( result ) {
 						window.requestAnimationFrame( function callDeathAnim() {
-							gameObject.components.enemies.deathAnimate( enemy, index );
+							gameObject.components.enemies.deathAnimate( enemy );
 						}	);
 					}
 
@@ -1450,15 +1465,15 @@ window.addEventListener( 'load', function startScript() {
 			powerUps: {
 
 				list: [],
-				spawnInterval: 35000,
+				spawnInterval: 30000,
 				spawnReferenceTime: 0,
 
 				spawnPowerUp() {
 
-					this.spawnInterval -= Math.random() * 600;
+					this.spawnInterval -= 500 + Math.random() * 500;
 
-					if ( this.spawnInterval < 10000 ) {
-						this.spawnInterval = 10000;
+					if ( this.spawnInterval < 14000 ) {
+						this.spawnInterval = 14000;
 					}
 
 					this.list.push( {
@@ -1919,7 +1934,7 @@ window.addEventListener( 'load', function startScript() {
 								gameObject.components.player.lives += 1;
 								break;
 							case 5:
-								gameObject.components.player.speed += .25;
+								gameObject.components.player.speed += .5;
 								break;
 							default:
 								console.log( 'Unknown power up!' );
@@ -1962,7 +1977,7 @@ window.addEventListener( 'load', function startScript() {
 
 						if ( enemy.hitPoints <= 0 && !enemy.dead ) {
 							enemy.dead = true;
-							gameObject.components.enemies.deathAnimate( enemy, index );
+							gameObject.components.enemies.deathAnimate( enemy );
 						}
 
 						// Shoot action
@@ -2015,7 +2030,7 @@ window.addEventListener( 'load', function startScript() {
 
 						if ( boss.hitPoints <= 0 ) {
 							boss.dead = true;
-							gameObject.components.enemies.deathAnimate( boss, index );
+							gameObject.components.enemies.deathAnimate( boss );
 						}
 
 					}
@@ -4479,15 +4494,18 @@ window.addEventListener( 'load', function startScript() {
 
 	// Start actions
 
-	leftBtn.addEventListener( 'touchstart', function moveLeft() {
+	leftBtn.addEventListener( 'touchstart', function moveLeft(e) {
+		e.preventDefault();		// To stop browser focus on mobiles
 		gameObject.components.player.movingLeft = true;
 	} );
 
-	rightBtn.addEventListener( 'touchstart', function moveRight() {
+	rightBtn.addEventListener( 'touchstart', function moveRight(e) {
+		e.preventDefault();		// To stop browser focus on mobiles
 		gameObject.components.player.movingRight = true;
 	} );
 
-	shootBtn.addEventListener( 'touchstart', function shoot() {
+	shootBtn.addEventListener( 'touchstart', function shoot(e) {
+		e.preventDefault();		// To stop browser focus on mobiles
 		gameObject.components.player.shooting = true;
 	} );
 
